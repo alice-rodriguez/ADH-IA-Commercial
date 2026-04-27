@@ -127,7 +127,7 @@ seuils:
 email:
   # Adresses des destinataires du digest quotidien
   destinataires:
-    - "contact@adh-consulting.fr"
+    - "alice.rodriguez@adhpmconsulting.com"
   # Heure d'envoi (format HH:MM, heure de Paris)
   heure_envoi: "07:00"
   # Jours d'envoi
