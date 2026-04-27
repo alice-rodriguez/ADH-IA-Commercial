@@ -1,0 +1,143 @@
+# ============================================================
+# CRITÈRES DE FILTRAGE — MODIFIABLE SANS TOUCHER AU CODE
+# ============================================================
+# Ce fichier contrôle tout ce que l'agent recherche et filtre.
+# Modifiez-le librement, sans risque de casser quoi que ce soit.
+# ============================================================
+
+# Profils de candidats que vous placez
+profils:
+  - "chef de projet"
+  - "business analyst"
+  - "BA"
+  - "MOA"
+  - "AMOA"
+  - "PMO"
+  - "project manager"
+  - "chargé de projet"
+
+# Secteurs d'activité ciblés
+secteurs:
+  - "banque"
+  - "assurance"
+  - "finance"
+  - "fintech"
+  - "asset management"
+  - "mutuelle"
+  - "bancaire"
+  - "services financiers"
+  - "établissement financier"
+
+# Types de contrat acceptés
+types_contrat:
+  - "CDI"
+  - "CDD"
+  - "Freelance"
+  - "Mission"
+  - "Appel d'offres"
+  - "Intérim"
+
+# Niveau de séniorité minimum
+seniorite_minimum: "Confirmé"
+
+# Zones géographiques acceptées
+localisation:
+  - "Île-de-France"
+  - "Paris"
+  - "75"
+  - "77"
+  - "78"
+  - "91"
+  - "92"
+  - "93"
+  - "94"
+  - "95"
+  - "Remote"
+  - "Hybride"
+  - "Télétravail"
+  - "distanciel"
+
+mots_cles:
+  # Au moins 1 mot-clé requis doit être présent dans l'offre
+  requis:
+    - "chef de projet"
+    - "business analyst"
+    - "BA"
+    - "MOA"
+    - "AMOA"
+    - "project manager"
+    - "chargé de projet"
+    - "responsable projet"
+
+  # Au moins 1 mot-clé sectoriel doit être présent
+  sectoriels:
+    - "banque"
+    - "assurance"
+    - "finance"
+    - "fintech"
+    - "asset management"
+    - "mutuelle"
+    - "bancaire"
+    - "financier"
+    - "financière"
+    - "établissement de crédit"
+
+  # Ces mots augmentent le score (mais ne sont pas obligatoires)
+  boost:
+    - "PMP"
+    - "PRINCE2"
+    - "Agile"
+    - "Scrum"
+    - "CBAP"
+    - "ITIL"
+    - "PMO"
+    - "transformation digitale"
+    - "SI"
+    - "système d'information"
+    - "AMOA"
+    - "cadrage"
+    - "gouvernance"
+
+  # Ces mots éliminent l'offre immédiatement (passe 1 gratuite)
+  exclus:
+    - "stage"
+    - "alternance"
+    - "apprentissage"
+    - "développeur"
+    - "développeuse"
+    - "data scientist"
+    - "data engineer"
+    - "débutant accepté"
+    - "junior accepté"
+    - "sans expérience"
+    - "ingénieur logiciel"
+    - "software engineer"
+    - "devops"
+
+seuils:
+  # Score minimum à la passe 1 (mots-clés) pour passer à l'IA
+  score_pre_filtre_minimum: 2
+  # Score minimum donné par l'IA (sur 100) pour inclure l'offre dans le digest
+  score_ia_minimum: 60
+  # Nombre maximum de profils CV suggérés par offre
+  top_matchings_par_offre: 3
+  # Nombre de jours sans ré-envoyer la même offre
+  fenetre_deduplication_jours: 7
+
+email:
+  # Adresses des destinataires du digest quotidien
+  destinataires:
+    - "contact@adh-consulting.fr"
+  # Heure d'envoi (format HH:MM, heure de Paris)
+  heure_envoi: "07:00"
+  # Jours d'envoi
+  jours:
+    - "lundi"
+    - "mardi"
+    - "mercredi"
+    - "jeudi"
+    - "vendredi"
+  # Envoyer même si aucune nouvelle offre ce jour-là ?
+  envoyer_si_vide: true
+  # Objet de l'email
+  objet: "ADH — Digest Opportunités du {date}"
