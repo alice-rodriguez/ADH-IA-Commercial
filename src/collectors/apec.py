@@ -189,7 +189,7 @@ class ApecCollector(BaseCollector):
     # ── Playwright fallback ───────────────────────────────────────────────────
 
     def _scraper_avec_playwright(self, urls: list) -> list[dict]:
-        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+        from playwright.sync_api import sync_playwright
 
         offres = []
         with sync_playwright() as p:
@@ -218,40 +218,92 @@ class ApecCollector(BaseCollector):
         return offres
 
     def _scraper_page_playwright(self, page, url: str) -> list[dict]:
-        from playwright.sync_api import TimeoutError as PWTimeout
+        """
+        Stratégie principale : interception réseau.
+        Quand le navigateur charge la page APEC, il appelle une API JSON en coulisses.
+        On intercepte cette réponse JSON directement — pas besoin de sélecteurs CSS.
+        Fallback : scraping HTML si aucune API n'est capturée.
+        """
+        import json as json_module
 
-        page.goto(url, wait_until="networkidle", timeout=45000)
+        reponses_api = []
 
-        # ── Trouver le bon sélecteur de liste ────────────────────────────────
+        # Patterns d'URL de l'API APEC (observable en inspectant le réseau dans DevTools)
+        PATTERNS_API = [
+            "rechercheoffre",
+            "rechercheOffre",
+            "offre/public",
+            "webservices/recherche",
+        ]
+
+        def capturer_reponse(response):
+            if response.status != 200:
+                return
+            if not any(p in response.url for p in PATTERNS_API):
+                return
+            try:
+                texte = response.text()
+                data = json_module.loads(texte)
+                reponses_api.append({"url": response.url, "data": data})
+                logger.info("[APEC][PW] API interceptée : %s", response.url[:100])
+            except Exception:
+                pass
+
+        page.on("response", capturer_reponse)
+        page.goto(url, wait_until="networkidle", timeout=60000)
+        page.remove_listener("response", capturer_reponse)
+
+        # ── Cas 1 : API interceptée → parse JSON direct ───────────────────────
+        if reponses_api:
+            offres = []
+            for item in reponses_api:
+                data = item["data"]
+                resultats = (
+                    data.get("resultats")
+                    or data.get("offres")
+                    or data.get("results")
+                    or (data if isinstance(data, list) else [])
+                )
+                if resultats:
+                    parsed = self._parser_api(resultats)
+                    offres.extend(parsed)
+                    logger.info(
+                        "[APEC][PW] %d offres extraites via interception API (%s)",
+                        len(parsed), item["url"][:80],
+                    )
+            return offres
+
+        # ── Cas 2 : Pas d'API interceptée → scraping HTML avec diagnostic ─────
+        logger.info("[APEC][PW] Aucune API interceptée — tentative scraping HTML")
+
         selecteur_items = None
         for sel in SELECTEURS_LISTE:
-            try:
-                page.wait_for_selector(sel, timeout=8000)
-                count = len(page.query_selector_all(sel))
-                if count > 0:
-                    selecteur_items = sel
-                    logger.info("[APEC][PW] Sélecteur liste trouvé : '%s' (%d items)", sel, count)
-                    break
-            except PWTimeout:
-                continue
+            items_trouves = page.query_selector_all(sel)
+            if len(items_trouves) >= 2:  # Au moins 2 items pour éviter les faux positifs
+                selecteur_items = sel
+                logger.info("[APEC][PW] Sélecteur HTML : '%s' (%d items)", sel, len(items_trouves))
+                break
 
         if not selecteur_items:
+            # Log de diagnostic pour identifier le problème à distance
             titre_page = page.title()
-            html_debut = page.content()[:800].replace("\n", " ")
+            # Cherche des indices dans le HTML sur ce qui est rendu
+            nb_articles = len(page.query_selector_all("article"))
+            nb_li = len(page.query_selector_all("li"))
+            nb_div = len(page.query_selector_all("div[class*='offer'], div[class*='result'], div[class*='job']"))
             logger.warning(
-                "[APEC][PW] AUCUN sélecteur trouvé sur %s\n"
-                "  Titre de la page : %s\n"
-                "  Début du HTML    : %s",
-                url[:80], titre_page, html_debut,
+                "[APEC][PW] DIAGNOSTIC — Titre: '%s' | articles: %d | li: %d | div[offer/result/job]: %d",
+                titre_page, nb_articles, nb_li, nb_div,
             )
+            # Log du premier article s'il existe (pour voir son contenu)
+            premier_article = page.query_selector("article")
+            if premier_article:
+                logger.warning("[APEC][PW] Contenu premier article: %s", premier_article.inner_text()[:300])
             return []
 
-        items = page.query_selector_all(selecteur_items)
         offres = []
-
-        for item in items[:20]:
+        for item in page.query_selector_all(selecteur_items)[:20]:
             try:
-                # Titre + lien
                 titre, lien = "", ""
                 for sel in SELECTEURS_TITRE:
                     el = item.query_selector(sel)
@@ -259,44 +311,31 @@ class ApecCollector(BaseCollector):
                         titre = el.inner_text().strip()
                         lien = el.get_attribute("href") or ""
                         break
-
                 if not titre:
                     continue
-
                 if lien and not lien.startswith("http"):
                     lien = f"https://www.apec.fr{lien}"
 
-                # Entreprise
-                entreprise = ""
-                for sel in SELECTEURS_ENTREPRISE:
-                    el = item.query_selector(sel)
-                    if el and el.inner_text().strip():
-                        entreprise = el.inner_text().strip()
-                        break
-
-                # Lieu
-                lieu = ""
-                for sel in SELECTEURS_LIEU:
-                    el = item.query_selector(sel)
-                    if el and el.inner_text().strip():
-                        lieu = el.inner_text().strip()
-                        break
-
-                description = item.inner_text().strip()[:500]
-
-                offres.append(
-                    self.normaliser(
-                        titre=titre,
-                        entreprise=entreprise,
-                        lieu=lieu or "Île-de-France",
-                        type_contrat="CDI/CDD",
-                        url=lien,
-                        description=description,
-                        source=self.nom,
-                    )
+                entreprise = next(
+                    (item.query_selector(s).inner_text().strip()
+                     for s in SELECTEURS_ENTREPRISE
+                     if item.query_selector(s) and item.query_selector(s).inner_text().strip()),
+                    "",
                 )
+                lieu = next(
+                    (item.query_selector(s).inner_text().strip()
+                     for s in SELECTEURS_LIEU
+                     if item.query_selector(s) and item.query_selector(s).inner_text().strip()),
+                    "",
+                )
+                offres.append(self.normaliser(
+                    titre=titre, entreprise=entreprise,
+                    lieu=lieu or "Île-de-France", type_contrat="CDI/CDD",
+                    url=lien, description=item.inner_text().strip()[:500],
+                    source=self.nom,
+                ))
             except Exception as e:
-                logger.debug("[APEC][PW] Erreur parsing item : %s", e)
+                logger.debug("[APEC][PW] Erreur parsing item HTML : %s", e)
 
         return offres
 
