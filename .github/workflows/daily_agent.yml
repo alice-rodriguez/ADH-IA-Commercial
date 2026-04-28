@@ -35,6 +35,9 @@ jobs:
       - name: Installer les dépendances
         run: pip install -r requirements.txt
 
+      - name: Installer le navigateur Playwright (Chromium)
+        run: python -m playwright install chromium --with-deps
+
       - name: Restaurer la base de données (déduplication entre les jours)
         uses: actions/cache/restore@v4
         with:

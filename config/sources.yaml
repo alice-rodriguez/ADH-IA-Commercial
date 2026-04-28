@@ -17,10 +17,14 @@ sources:
   apec:
     active: true
     nom: "APEC"
-    type: "scraping"
-    description: "Association Pour l'Emploi des Cadres"
-    url_base: "https://www.apec.fr"
+    type: "playwright"
+    description: "Association Pour l'Emploi des Cadres — SPA Angular (API REST + Playwright fallback)"
     delai_secondes: 3
+    urls:
+      - "https://www.apec.fr/candidat/recherche-emploi.html/emploi?motsCles=chef%20de%20projet&typesConvention=143684&typesConvention=143685&typesConvention=143686&typesConvention=143687&secteursActivite=101757&teletravailFrequence=FULL_REMOTE&lieux=711&page=0"
+      - "https://www.apec.fr/candidat/recherche-emploi.html/emploi?motsCles=business%20analyst&typesConvention=143684&typesConvention=143685&typesConvention=143686&typesConvention=143687&secteursActivite=101757&teletravailFrequence=FULL_REMOTE&lieux=711&page=0"
+      - "https://www.apec.fr/candidat/recherche-emploi.html/emploi?motsCles=moa&typesConvention=143684&typesConvention=143685&typesConvention=143686&typesConvention=143687&secteursActivite=101757&teletravailFrequence=FULL_REMOTE&lieux=711&page=0"
+      - "https://www.apec.fr/candidat/recherche-emploi.html/emploi?motsCles=moa&typesConvention=143684&typesConvention=143685&typesConvention=143686&typesConvention=143687&secteursActivite=101757&teletravailFrequence=FULL_REMOTE&typesTeletravail=20767"
 
   indeed:
     active: true
