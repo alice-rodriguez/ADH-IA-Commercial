@@ -1,13 +1,20 @@
 name: Agent ADH — Digest Quotidien
 
 on:
+  workflow_dispatch:
+    inputs:
+      mode_test:
+        description: 'Mode test (injecte 2 offres fictives)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
   schedule:
     # Tous les jours à 06h00 UTC = 07h00 heure de Paris (heure d'été)
-    # En heure d'hiver, ajustez à 06h00 UTC = 07h00 (UTC+1)
     - cron: "0 6 * * 1-5"   # Lundi à vendredi uniquement
-
-  # Permet de lancer manuellement depuis l'interface GitHub (pour les tests)
-  workflow_dispatch:
 
 jobs:
   digest:
@@ -28,21 +35,34 @@ jobs:
       - name: Installer les dépendances
         run: pip install -r requirements.txt
 
-      - name: Lancer l'agent ADH
-        env:
-          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
-          EMAIL_EXPEDITEUR:    ${{ secrets.EMAIL_EXPEDITEUR }}
-          EMAIL_MOT_DE_PASSE:  ${{ secrets.EMAIL_MOT_DE_PASSE }}
-          EMAIL_SERVEUR_SMTP:  smtp.office365.com
-          EMAIL_PORT_SMTP:     "587"
-          DB_PATH:             data/offers.db
-          CVS_PATH:            cvs/
-        run: python -m src.main
-
-      - name: Sauvegarder la base de données (entre les exécutions)
-        uses: actions/cache@v4
+      - name: Restaurer la base de données (déduplication entre les jours)
+        uses: actions/cache/restore@v4
         with:
           path: data/
-          key: adh-database-${{ github.run_id }}
+          key: adh-database-latest
           restore-keys: |
             adh-database-
+
+      - name: Lancer l'agent ADH
+        env:
+          # IA
+          ANTHROPIC_API_KEY:    ${{ secrets.ANTHROPIC_API_KEY }}
+          # Email expéditeur
+          EMAIL_EXPEDITEUR:     ${{ secrets.EMAIL_EXPEDITEUR }}
+          # Azure AD — Microsoft Graph API
+          AZURE_TENANT_ID:      ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID:      ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET:  ${{ secrets.AZURE_CLIENT_SECRET }}
+          # Chemins
+          DB_PATH:              data/offers.db
+          CVS_PATH:             cvs/
+          # Mode test (manuel uniquement)
+          MODE_TEST:            ${{ inputs.mode_test || 'false' }}
+        run: python -m src.main
+
+      - name: Sauvegarder la base de données
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/
+          key: adh-database-latest
