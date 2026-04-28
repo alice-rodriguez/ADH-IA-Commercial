@@ -10,8 +10,8 @@ sources:
     active: true
     nom: "BOAMP"
     type: "api"
-    description: "Bulletin Officiel des Annonces des Marchés Publics — API officielle gratuite"
-    url_base: "https://www.boamp.fr/api/search/"
+    description: "Bulletin Officiel des Annonces des Marchés Publics — API Opendatasoft"
+    url_base: "https://boamp-datadila.opendatasoft.com/api/records/1.0/search/"
     delai_secondes: 1
 
   apec:
