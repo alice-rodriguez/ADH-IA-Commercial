@@ -250,8 +250,18 @@ class ApecCollector(BaseCollector):
                 pass
 
         page.on("response", capturer_reponse)
-        page.goto(url, wait_until="networkidle", timeout=60000)
-        page.remove_listener("response", capturer_reponse)
+        try:
+            page.goto(url, wait_until="networkidle", timeout=60000)
+        except Exception as e:
+            if "timeout" in str(e).lower():
+                if reponses_api:
+                    logger.warning("[APEC][PW] networkidle timeout — %d réponses API déjà capturées, on continue", len(reponses_api))
+                else:
+                    logger.error("[APEC][PW] Timeout sans interception API : %s", url[:80])
+            else:
+                raise
+        finally:
+            page.remove_listener("response", capturer_reponse)
 
         # ── Cas 1 : API interceptée → parse JSON direct ───────────────────────
         if reponses_api:

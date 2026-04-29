@@ -137,9 +137,19 @@ class WTJCollector(BaseCollector):
                 data = json_module.loads(texte)
                 # Algolia retourne soit {"hits": [...]} soit {"results": [{"hits": [...]}]}
                 hits = self._extraire_hits(data)
-                if hits:
-                    reponses_algolia.append({"url": response.url, "hits": hits})
-                    logger.info("[WTJ][PW] Algolia interceptée : %d hits (%s)", len(hits), response.url[:80])
+                if not hits:
+                    return
+                # Filtrer les indices non-emploi (ex: wk_cms_organizations → fiche société)
+                sample = hits[0]
+                is_job_hit = any(k in sample for k in [
+                    "contract_type", "contractType", "offices", "profession",
+                    "sector", "published_at", "publishedAt",
+                ])
+                if not is_job_hit:
+                    logger.debug("[WTJ][PW] Algolia ignorée (index non-emploi) : %s", response.url[:80])
+                    return
+                reponses_algolia.append({"url": response.url, "hits": hits})
+                logger.info("[WTJ][PW] Algolia emploi interceptée : %d hits (%s)", len(hits), response.url[:80])
             except Exception:
                 pass
 
