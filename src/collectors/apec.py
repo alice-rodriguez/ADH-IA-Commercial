@@ -33,14 +33,20 @@ URLS_APEC_DEFAULT = [
     "https://www.apec.fr/candidat/recherche-emploi.html/emploi?motsCles=moa&typesConvention=143684&typesConvention=143685&typesConvention=143686&typesConvention=143687&secteursActivite=101757&teletravailFrequence=FULL_REMOTE&typesTeletravail=20767",
 ]
 
-# Sélecteurs CSS à essayer dans l'ordre (Playwright fallback)
+# Sélecteurs CSS à essayer dans l'ordre (Playwright fallback HTML)
 SELECTEURS_LISTE = [
+    "[data-id-offre]",
+    "[data-numoffre]",
     "ul.result-list li",
+    "li[class*='result']",
+    "li[class*='offre']",
+    "li[class*='offer']",
+    "li[class*='card']",
+    "div[class*='card-offre']",
     "div.result-item",
     "article.offer-card",
     "li.offer-item",
     ".results-list li",
-    "[data-id-offre]",
     "article",
 ]
 SELECTEURS_TITRE = ["h2 a", "h2", "h3 a", "h3", ".title a", ".title", "a.offer-link"]
@@ -251,17 +257,17 @@ class ApecCollector(BaseCollector):
 
         page.on("response", capturer_reponse)
         try:
-            page.goto(url, wait_until="networkidle", timeout=60000)
+            # domcontentloaded est rapide et ne bloque pas sur les traqueurs/pubs
+            # qui empêchent networkidle de se déclencher sur APEC (SPA Angular)
+            page.goto(url, wait_until="domcontentloaded", timeout=30000)
         except Exception as e:
-            if "timeout" in str(e).lower():
-                if reponses_api:
-                    logger.warning("[APEC][PW] networkidle timeout — %d réponses API déjà capturées, on continue", len(reponses_api))
-                else:
-                    logger.error("[APEC][PW] Timeout sans interception API : %s", url[:80])
-            else:
-                raise
-        finally:
+            logger.error("[APEC][PW] Erreur chargement : %s", str(e)[:100])
             page.remove_listener("response", capturer_reponse)
+            return []
+
+        # Laisser Angular initialiser et appeler son API de recherche (~3-8s)
+        page.wait_for_timeout(12000)
+        page.remove_listener("response", capturer_reponse)
 
         # ── Cas 1 : API interceptée → parse JSON direct ───────────────────────
         if reponses_api:

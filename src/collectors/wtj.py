@@ -27,26 +27,36 @@ PATTERNS_ALGOLIA = [
     "algolia.io",
 ]
 
-# Sélecteurs CSS de fallback (scraping HTML)
+# Sélecteurs CSS de fallback (scraping HTML — Next.js SSR)
 SELECTEURS_LISTE = [
+    "li[data-testid='search-results-list-item']",
+    "li[data-role*='job']",
+    "li[class*='job']",
+    "li[class*='result']",
     "li[data-testid]",
-    "ul li",
+    "article[class*='job']",
     "article",
-    "div[class*='job']",
+    "div[class*='job-card']",
+    "div[class*='jobCard']",
     "div[class*='result']",
 ]
 SELECTEURS_TITRE = [
-    "h2 a", "h2", "h3 a", "h3",
     "[data-testid='job-title']",
-    ".title", "a[href*='/jobs/']",
+    "[data-testid='job-name']",
+    "h2 a", "h2", "h3 a", "h3",
+    ".title a", ".title",
+    "a[href*='/jobs/']",
 ]
 SELECTEURS_ENTREPRISE = [
     "[data-testid='company-name']",
+    "[data-testid='organization-name']",
     ".company", ".employer",
     "span[class*='company']",
+    "span[class*='organization']",
 ]
 SELECTEURS_LIEU = [
     "[data-testid='location']",
+    "[data-testid='job-location']",
     ".location", ".lieu",
     "span[class*='location']",
     "span[class*='city']",
@@ -139,17 +149,18 @@ class WTJCollector(BaseCollector):
                 hits = self._extraire_hits(data)
                 if not hits:
                     return
-                # Filtrer les indices non-emploi (ex: wk_cms_organizations → fiche société)
+                # Exclure explicitement l'index organisations (fiches société, pas des offres)
+                if "organization" in response.url.lower():
+                    logger.debug("[WTJ][PW] Algolia ignorée (index organisations) : %s", response.url[:80])
+                    return
+                # contract_type est présent uniquement dans les hits d'offres d'emploi
                 sample = hits[0]
-                is_job_hit = any(k in sample for k in [
-                    "contract_type", "contractType", "offices", "profession",
-                    "sector", "published_at", "publishedAt",
-                ])
-                if not is_job_hit:
-                    logger.debug("[WTJ][PW] Algolia ignorée (index non-emploi) : %s", response.url[:80])
+                if "contract_type" not in sample and "contractType" not in sample:
+                    logger.debug("[WTJ][PW] Algolia ignorée (pas de contract_type) : %s | champs: %s",
+                                 response.url[:60], list(sample.keys())[:8])
                     return
                 reponses_algolia.append({"url": response.url, "hits": hits})
-                logger.info("[WTJ][PW] Algolia emploi interceptée : %d hits (%s)", len(hits), response.url[:80])
+                logger.info("[WTJ][PW] Algolia emplois interceptée : %d hits (%s)", len(hits), response.url[:80])
             except Exception:
                 pass
 
