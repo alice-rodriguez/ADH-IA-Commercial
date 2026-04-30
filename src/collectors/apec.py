@@ -1,11 +1,11 @@
 """
 Collecteur APEC — Association Pour l'Emploi des Cadres.
 
-Stratégie en deux temps :
-  1. API REST interne (rapide, sans navigateur, prioritaire)
-     APEC est une Angular SPA qui appelle un backend JSON.
-     On appelle ce backend directement — plus stable que le scraping HTML.
-  2. Playwright headless (fallback si l'API change ou retourne 403)
+Stratégie : Playwright headless avec interception réseau.
+  APEC est une Angular SPA — le navigateur charge la page et appelle
+  une API JSON interne. On intercepte cette réponse directement.
+  Pagination : on recharge successivement &page=0, &page=1, ... jusqu'à
+  0 résultats ou MAX_PAGES_APEC pages.
 
 URLs de recherche configurées dans config/sources.yaml > apec > urls.
 Elles ciblent : chef de projet / business analyst / MOA
@@ -21,13 +21,9 @@ from .base import BaseCollector
 
 logger = logging.getLogger(__name__)
 
-# API REST interne qu'APEC appelle depuis son frontend Angular
-# (observable en inspectant les requêtes réseau du navigateur sur apec.fr)
-API_REST_URL = "https://www.apec.fr/cms/webservices/rechercheoffre/paginer"
+MAX_PAGES_APEC = 5  # 5 pages × ~15-20 offres = ~75-100 offres max par mot-clé
 
-MAX_PAGES_APEC = 5  # 5 pages × 20 = 100 offres max par mot-clé
-
-# URLs de la SPA Angular (fallback Playwright)
+# URLs de la SPA Angular
 URLS_APEC_DEFAULT = [
     "https://www.apec.fr/candidat/recherche-emploi.html/emploi?motsCles=chef%20de%20projet&typesConvention=143684&typesConvention=143685&typesConvention=143686&typesConvention=143687&secteursActivite=101757&teletravailFrequence=FULL_REMOTE&lieux=711&page=0",
     "https://www.apec.fr/candidat/recherche-emploi.html/emploi?motsCles=business%20analyst&typesConvention=143684&typesConvention=143685&typesConvention=143686&typesConvention=143687&secteursActivite=101757&teletravailFrequence=FULL_REMOTE&lieux=711&page=0",
@@ -59,16 +55,6 @@ SELECTEURS_LIEU = [".location", ".localisation", ".lieu", "span.location"]
 class ApecCollector(BaseCollector):
     def collecter(self, criteres: dict) -> list[dict]:
         urls = self.config.get("urls", URLS_APEC_DEFAULT)
-
-        # ── Tentative 1 : API REST interne ───────────────────────────────────
-        offres = self._essayer_api_rest(criteres)
-        if offres:
-            logger.info("[APEC] API REST : %d offres collectées", len(offres))
-            return self._dedupliquer(offres)
-
-        logger.info("[APEC] API REST indisponible — bascule sur Playwright")
-
-        # ── Tentative 2 : Playwright headless ────────────────────────────────
         try:
             offres = self._scraper_avec_playwright(urls)
         except ImportError:
@@ -77,88 +63,7 @@ class ApecCollector(BaseCollector):
         except Exception as e:
             logger.error("[APEC] Erreur Playwright : %s", e)
             return []
-
         return self._dedupliquer(offres)
-
-    # ── API REST ──────────────────────────────────────────────────────────────
-
-    def _essayer_api_rest(self, criteres: dict) -> list[dict]:
-        """
-        Appelle l'API JSON interne d'APEC avec pagination.
-        MAX_PAGES_APEC pages max par mot-clé (100 offres), délai 2s entre pages.
-        """
-        headers_api = {
-            **self.session.headers,
-            "Accept": "application/json, text/plain, */*",
-            "Referer": "https://www.apec.fr/candidat/recherche-emploi.html/emploi",
-            "X-Requested-With": "XMLHttpRequest",
-        }
-
-        recherches = [
-            {"motsCles": "chef de projet", "secteursActivite": [101757]},
-            {"motsCles": "business analyst", "secteursActivite": [101757]},
-            {"motsCles": "MOA", "secteursActivite": [101757]},
-        ]
-
-        offres = []
-        for params_recherche in recherches:
-            mots_cles = params_recherche["motsCles"]
-            offres_motcle = []
-            nb_pages = 0
-
-            for page_num in range(MAX_PAGES_APEC):
-                payload = {
-                    "motsCles": mots_cles,
-                    "typesConvention": [143684, 143685, 143686, 143687],
-                    "secteursActivite": params_recherche["secteursActivite"],
-                    "lieux": [711],
-                    "nbResultatsParPage": 20,
-                    "page": page_num,
-                    "avecNbOffreParDomaineMetier": False,
-                }
-                try:
-                    time.sleep(2)
-                    response = self.session.post(
-                        API_REST_URL,
-                        json=payload,
-                        headers=headers_api,
-                        timeout=15,
-                    )
-                    if response.status_code != 200:
-                        logger.debug("[APEC] API REST HTTP %d — '%s' page %d",
-                                     response.status_code, mots_cles, page_num)
-                        break
-
-                    data = response.json()
-                    resultats = (
-                        data.get("resultats", [])
-                        or data.get("offres", [])
-                        or data.get("results", [])
-                        or (data if isinstance(data, list) else [])
-                    )
-
-                    if not resultats:
-                        logger.info("[APEC] '%s' page %d : 0 résultats — fin de pagination",
-                                    mots_cles, page_num)
-                        break
-
-                    logger.info("[APEC] Page %d de '%s' : %d offres récupérées",
-                                page_num, mots_cles, len(resultats))
-                    offres_motcle.extend(self._parser_api(resultats))
-                    nb_pages += 1
-
-                    if len(resultats) < 20:
-                        break  # dernière page partielle
-
-                except Exception as e:
-                    logger.debug("[APEC] API REST erreur '%s' page %d : %s", mots_cles, page_num, e)
-                    break
-
-            logger.info("[APEC] Total '%s' : %d offres sur %d page(s)",
-                        mots_cles, len(offres_motcle), nb_pages)
-            offres.extend(offres_motcle)
-
-        return offres
 
     def _parser_api(self, resultats: list) -> list[dict]:
         """Parse les résultats JSON de l'API interne APEC."""
@@ -262,9 +167,11 @@ class ApecCollector(BaseCollector):
                     nb_ecartees_date, len(offres))
         return offres
 
-    # ── Playwright fallback ───────────────────────────────────────────────────
+    # ── Playwright ────────────────────────────────────────────────────────────
 
     def _scraper_avec_playwright(self, urls: list) -> list[dict]:
+        import re as re_module
+        from urllib.parse import unquote
         from playwright.sync_api import sync_playwright
 
         offres = []
@@ -280,65 +187,41 @@ class ApecCollector(BaseCollector):
             )
             page = context.new_page()
 
-            for i, url in enumerate(urls):
-                try:
-                    logger.info("[APEC][PW] Chargement : %s", url[:80])
-                    nouvelles = self._scraper_page_playwright(page, url)
-                    offres.extend(nouvelles)
-                    logger.info("[APEC][PW] → %d offres", len(nouvelles))
+            for url_base in urls:
+                mots_cles = "?"
+                if "motsCles=" in url_base:
+                    mots_cles = unquote(url_base.split("motsCles=")[1].split("&")[0])
 
-                    # ── TEMPORAIRE : diagnostic pagination (1ère URL uniquement) ──
-                    if i == 0 and not getattr(self, "_diag_pagination_pw_done", False):
-                        self._diag_pagination_pw_done = True
+                offres_url = []
+                nb_pages = 0
 
-                        # Option A : lister tous les liens <ul><li><a> (pagination numérotée SPA)
-                        liens_pag = page.locator("xpath=//ul//li/a").all()
-                        logger.info("[APEC-PAGINATION-DIAG] Option A : %d liens ul>li>a trouvés", len(liens_pag))
-                        for idx, lien in enumerate(liens_pag[:15]):
-                            try:
-                                texte = lien.text_content().strip()
-                                logger.info("[APEC-PAG-LINKS] Lien %d: '%s'", idx, texte)
-                            except Exception:
-                                pass
+                for page_num in range(MAX_PAGES_APEC):
+                    if re_module.search(r"page=\d+", url_base):
+                        url_page = re_module.sub(r"page=\d+", f"page={page_num}", url_base)
+                    else:
+                        url_page = url_base + f"&page={page_num}"
 
-                        # Option B : bouton "page suivante" nommé dans le DOM
-                        selecteurs_next = [
-                            "button[aria-label*='uivant']",
-                            "a[aria-label*='uivant']",
-                            ".pagination-next",
-                            "li.next a",
-                            "button[aria-label*='next']",
-                            "a[aria-label*='next']",
-                            "[data-automation='pagination-next']",
-                            "nav[aria-label*='agination'] a",
-                            ".pagination li:last-child a",
-                        ]
-                        bouton_trouve = None
-                        for sel in selecteurs_next:
-                            el = page.query_selector(sel)
-                            if el:
-                                bouton_trouve = f"{sel} → texte='{el.inner_text().strip()[:50]}'"
-                                break
-                        logger.info("[APEC-PAGINATION-DIAG] Option B (bouton nommé) : %s",
-                                    bouton_trouve or "INTROUVABLE")
+                    try:
+                        nouvelles = self._scraper_page_playwright(page, url_page)
+                        logger.info("[APEC] Page %d de '%s' : %d offres récupérées",
+                                    page_num, mots_cles, len(nouvelles))
 
-                        # Option C : paramètre page=0 → page=1 dans l'URL (probablement sans effet SPA)
-                        if "page=0" in url:
-                            url_page1 = url.replace("page=0", "page=1")
-                            logger.info("[APEC-PAGINATION-DIAG] Option C : test URL page=1")
-                            try:
-                                nouvelles_p1 = self._scraper_page_playwright(page, url_page1)
-                                logger.info("[APEC-PAGINATION-DIAG] Option C (URL page=1) : %d offres interceptées",
-                                            len(nouvelles_p1))
-                            except Exception as e_diag:
-                                logger.info("[APEC-PAGINATION-DIAG] Option C erreur : %s", str(e_diag)[:100])
-                        else:
-                            logger.info("[APEC-PAGINATION-DIAG] Option C : URL sans 'page=0' — non applicable")
-                    # ── FIN DIAGNOSTIC ─────────────────────────────────────────
+                        if not nouvelles:
+                            break
 
-                    time.sleep(self.delai)
-                except Exception as e:
-                    logger.error("[APEC][PW] Erreur sur %s : %s", url[:80], e)
+                        offres_url.extend(nouvelles)
+                        nb_pages += 1
+
+                        if page_num < MAX_PAGES_APEC - 1:
+                            time.sleep(self.delai)
+
+                    except Exception as e:
+                        logger.error("[APEC][PW] Erreur page %d de '%s' : %s", page_num, mots_cles, e)
+                        break
+
+                logger.info("[APEC] Total '%s' : %d offres sur %d page(s)",
+                            mots_cles, len(offres_url), nb_pages)
+                offres.extend(offres_url)
 
             browser.close()
         return offres
