@@ -37,16 +37,10 @@ sources:
   welcometothejungle:
     active: true
     nom: "Welcome to the Jungle"
-    type: "playwright"
-    description: "Plateforme emploi Next.js — Algolia search interception + Playwright fallback"
-    delai_secondes: 3
-    urls:
-      - "https://www.welcometothejungle.com/fr/jobs?query=chef%20de%20projet&refinementList%5Boffices.country_code%5D%5B%5D=FR&refinementList%5Bcontract_type%5D%5B%5D=full_time&refinementList%5Bcontract_type%5D%5B%5D=temporary&refinementList%5Bcontract_type%5D%5B%5D=freelance"
-      - "https://www.welcometothejungle.com/fr/jobs?query=business%20analyst&refinementList%5Boffices.country_code%5D%5B%5D=FR&refinementList%5Bcontract_type%5D%5B%5D=full_time&refinementList%5Bcontract_type%5D%5B%5D=temporary&refinementList%5Bcontract_type%5D%5B%5D=freelance"
-      - "https://www.welcometothejungle.com/fr/jobs?query=MOA%20banque&refinementList%5Boffices.country_code%5D%5B%5D=FR&refinementList%5Bcontract_type%5D%5B%5D=full_time&refinementList%5Bcontract_type%5D%5B%5D=temporary"
-      - "https://www.welcometothejungle.com/fr/jobs?query=AMOA%20finance&refinementList%5Boffices.country_code%5D%5B%5D=FR&refinementList%5Bcontract_type%5D%5B%5D=full_time&refinementList%5Bcontract_type%5D%5B%5D=temporary"
-      - "https://www.welcometothejungle.com/fr/jobs?query=project%20manager%20banque&refinementList%5Boffices.country_code%5D%5B%5D=FR&refinementList%5Bcontract_type%5D%5B%5D=full_time&refinementList%5Bcontract_type%5D%5B%5D=temporary&refinementList%5Bcontract_type%5D%5B%5D=freelance"
-      - "https://www.welcometothejungle.com/fr/jobs?query=PMO%20assurance&refinementList%5Boffices.country_code%5D%5B%5D=FR&refinementList%5Bcontract_type%5D%5B%5D=full_time&refinementList%5Bcontract_type%5D%5B%5D=temporary"
+    type: "scraping_html"
+    description: "Pages emploi publiques (HTML statique, sans authentification)"
+    url_base: "https://www.welcometothejungle.com"
+    delai_secondes: 2
 
   freelance_com:
     active: true
