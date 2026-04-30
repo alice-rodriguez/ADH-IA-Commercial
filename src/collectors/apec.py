@@ -147,6 +147,10 @@ class ApecCollector(BaseCollector):
 
         offres = []
         date_limite = datetime.now(timezone.utc) - timedelta(days=14)
+        nb_ecartees_date = 0
+
+        # TEMPORAIRE — collecte les codes de contrat rencontrés pour enrichir le mapping
+        codes_contrats_vus: dict[str, int] = {}
 
         # Mapping des codes de type de contrat APEC → libellé lisible
         CONTRATS_APEC = {
@@ -170,6 +174,7 @@ class ApecCollector(BaseCollector):
                     # Format APEC : "2026-04-15T14:41:21.000+0000" — on prend les 10 premiers chars
                     date_pub = datetime.strptime(date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
                     if date_pub < date_limite:
+                        nb_ecartees_date += 1
                         continue
                 except Exception:
                     pass  # parsing impossible → on garde l'offre par sécurité
@@ -211,6 +216,8 @@ class ApecCollector(BaseCollector):
             else:
                 code = str(type_contrat_raw).strip()
                 type_contrat = CONTRATS_APEC.get(code, code or "CDI/CDD")
+                if code:  # TEMPORAIRE — collecte les codes pour enrichir le mapping
+                    codes_contrats_vus[code] = codes_contrats_vus.get(code, 0) + 1
 
             # ── Description — texteOffre contient la vraie description ─────────
             description = (
@@ -231,6 +238,14 @@ class ApecCollector(BaseCollector):
                     source=self.nom,
                 )
             )
+
+        logger.info("[APEC] Filtre temporel : %d offres écartées (>14 jours), %d conservées",
+                    nb_ecartees_date, len(offres))
+
+        # TEMPORAIRE — à retirer une fois le mapping de contrats complété
+        if codes_contrats_vus:
+            logger.info("[APEC-CONTRACTS] Codes typesConvention rencontrés : %s", codes_contrats_vus)
+
         return offres
 
     # ── Playwright fallback ───────────────────────────────────────────────────
