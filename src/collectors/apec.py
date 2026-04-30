@@ -110,6 +110,12 @@ class ApecCollector(BaseCollector):
                 "avecNbOffreParDomaineMetier": False,
             }
             try:
+                # TEMPORAIRE — affiche le body envoyé et les clés de la réponse pour diagnostiquer la pagination
+                if not getattr(self, "_diag_pagination_logged", False):
+                    import json as _json
+                    logger.info("[APEC-PAGINATION] Body POST envoyé : %s", _json.dumps(payload, ensure_ascii=False))
+                    self._diag_pagination_logged = True
+
                 time.sleep(self.delai)
                 response = self.session.post(
                     API_REST_URL,
@@ -125,6 +131,11 @@ class ApecCollector(BaseCollector):
                     return []
 
                 data = response.json()
+                # TEMPORAIRE — affiche les clés racine de la réponse (pour trouver le champ "total")
+                if not getattr(self, "_diag_pagination_resp_logged", False):
+                    cles_et_types = {k: type(v).__name__ for k, v in data.items()} if isinstance(data, dict) else type(data).__name__
+                    logger.info("[APEC-PAGINATION] Clés réponse API : %s", cles_et_types)
+                    self._diag_pagination_resp_logged = True
                 resultats = (
                     data.get("resultats", [])
                     or data.get("offres", [])
