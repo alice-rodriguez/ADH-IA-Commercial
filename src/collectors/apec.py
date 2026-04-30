@@ -143,6 +143,13 @@ class ApecCollector(BaseCollector):
     def _parser_api(self, resultats: list) -> list[dict]:
         """Parse les résultats JSON de l'API interne APEC."""
         offres = []
+
+        # TEMPORAIRE — à retirer une fois confirmé que numIdOffre contient la lettre finale
+        if resultats and not getattr(self, "_diag_apec_logged", False):
+            import json as _json
+            logger.info("[APEC-DIAG] Premier résultat brut : %s", _json.dumps(resultats[0], ensure_ascii=False)[:800])
+            self._diag_apec_logged = True  # une seule fois par run
+
         for r in resultats:
             # L'API peut retourner les champs sous différentes clés selon la version
             titre = (
@@ -165,8 +172,11 @@ class ApecCollector(BaseCollector):
             elif isinstance(loc, str):
                 lieu = loc
 
-            id_offre = r.get("numIdOffre") or r.get("id") or r.get("offerId", "")
-            url = f"https://www.apec.fr/candidat/offresEmploi.do?numIdOffre={id_offre}" if id_offre else ""
+            id_offre = str(r.get("numIdOffre") or r.get("id") or r.get("offerId") or "")
+            url = (
+                f"https://www.apec.fr/candidat/recherche-emploi.html/emploi/detail-offre/{id_offre}"
+                if id_offre else ""
+            )
 
             type_contrat_raw = r.get("typeContrat") or r.get("libelleTypeContrat") or {}
             if isinstance(type_contrat_raw, dict):
