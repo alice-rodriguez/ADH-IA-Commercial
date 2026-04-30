@@ -280,12 +280,62 @@ class ApecCollector(BaseCollector):
             )
             page = context.new_page()
 
-            for url in urls:
+            for i, url in enumerate(urls):
                 try:
                     logger.info("[APEC][PW] Chargement : %s", url[:80])
                     nouvelles = self._scraper_page_playwright(page, url)
                     offres.extend(nouvelles)
                     logger.info("[APEC][PW] → %d offres", len(nouvelles))
+
+                    # ── TEMPORAIRE : diagnostic pagination (1ère URL uniquement) ──
+                    if i == 0 and not getattr(self, "_diag_pagination_pw_done", False):
+                        self._diag_pagination_pw_done = True
+
+                        # Option A : lister tous les liens <ul><li><a> (pagination numérotée SPA)
+                        liens_pag = page.locator("xpath=//ul//li/a").all()
+                        logger.info("[APEC-PAGINATION-DIAG] Option A : %d liens ul>li>a trouvés", len(liens_pag))
+                        for idx, lien in enumerate(liens_pag[:15]):
+                            try:
+                                texte = lien.text_content().strip()
+                                logger.info("[APEC-PAG-LINKS] Lien %d: '%s'", idx, texte)
+                            except Exception:
+                                pass
+
+                        # Option B : bouton "page suivante" nommé dans le DOM
+                        selecteurs_next = [
+                            "button[aria-label*='uivant']",
+                            "a[aria-label*='uivant']",
+                            ".pagination-next",
+                            "li.next a",
+                            "button[aria-label*='next']",
+                            "a[aria-label*='next']",
+                            "[data-automation='pagination-next']",
+                            "nav[aria-label*='agination'] a",
+                            ".pagination li:last-child a",
+                        ]
+                        bouton_trouve = None
+                        for sel in selecteurs_next:
+                            el = page.query_selector(sel)
+                            if el:
+                                bouton_trouve = f"{sel} → texte='{el.inner_text().strip()[:50]}'"
+                                break
+                        logger.info("[APEC-PAGINATION-DIAG] Option B (bouton nommé) : %s",
+                                    bouton_trouve or "INTROUVABLE")
+
+                        # Option C : paramètre page=0 → page=1 dans l'URL (probablement sans effet SPA)
+                        if "page=0" in url:
+                            url_page1 = url.replace("page=0", "page=1")
+                            logger.info("[APEC-PAGINATION-DIAG] Option C : test URL page=1")
+                            try:
+                                nouvelles_p1 = self._scraper_page_playwright(page, url_page1)
+                                logger.info("[APEC-PAGINATION-DIAG] Option C (URL page=1) : %d offres interceptées",
+                                            len(nouvelles_p1))
+                            except Exception as e_diag:
+                                logger.info("[APEC-PAGINATION-DIAG] Option C erreur : %s", str(e_diag)[:100])
+                        else:
+                            logger.info("[APEC-PAGINATION-DIAG] Option C : URL sans 'page=0' — non applicable")
+                    # ── FIN DIAGNOSTIC ─────────────────────────────────────────
+
                     time.sleep(self.delai)
                 except Exception as e:
                     logger.error("[APEC][PW] Erreur sur %s : %s", url[:80], e)
