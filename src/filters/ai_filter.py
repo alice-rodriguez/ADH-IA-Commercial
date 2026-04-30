@@ -17,9 +17,6 @@ import anthropic
 
 logger = logging.getLogger(__name__)
 
-# TEMPORAIRE — flag pour le log [AI-DIAG-APEC] (1 seul log par run)
-_diag_apec_payload_logged = False
-
 MODELE = "claude-haiku-4-5-20251001"
 TARIF_ENTREE  = 0.25 / 1_000_000   # $ par token
 TARIF_SORTIE  = 1.25 / 1_000_000   # $ par token
@@ -67,12 +64,6 @@ Score 0-100 :
   50-69  = Pertinent mais quelques doutes
   30-49  = Peu pertinent
   0-29   = Hors cible"""
-
-    # TEMPORAIRE — affiche une fois le payload complet pour la 1ère offre APEC
-    global _diag_apec_payload_logged
-    if not _diag_apec_payload_logged and offre.get("source", "").upper() == "APEC":
-        logger.info("[AI-DIAG-APEC] Payload envoyé à Claude Haiku (1ère offre APEC) :\n%s", prompt[:1500])
-        _diag_apec_payload_logged = True
 
     try:
         reponse = client.messages.create(

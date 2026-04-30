@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 # (observable en inspectant les requêtes réseau du navigateur sur apec.fr)
 API_REST_URL = "https://www.apec.fr/cms/webservices/rechercheoffre/paginer"
 
+MAX_PAGES_APEC = 5  # 5 pages × 20 = 100 offres max par mot-clé
+
 # URLs de la SPA Angular (fallback Playwright)
 URLS_APEC_DEFAULT = [
     "https://www.apec.fr/candidat/recherche-emploi.html/emploi?motsCles=chef%20de%20projet&typesConvention=143684&typesConvention=143685&typesConvention=143686&typesConvention=143687&secteursActivite=101757&teletravailFrequence=FULL_REMOTE&lieux=711&page=0",
@@ -82,8 +84,8 @@ class ApecCollector(BaseCollector):
 
     def _essayer_api_rest(self, criteres: dict) -> list[dict]:
         """
-        Appelle l'API JSON interne d'APEC.
-        Paramètres reproduits depuis les URLs de recherche utilisateur.
+        Appelle l'API JSON interne d'APEC avec pagination.
+        MAX_PAGES_APEC pages max par mot-clé (100 offres), délai 2s entre pages.
         """
         headers_api = {
             **self.session.headers,
@@ -100,54 +102,61 @@ class ApecCollector(BaseCollector):
 
         offres = []
         for params_recherche in recherches:
-            payload = {
-                "motsCles": params_recherche["motsCles"],
-                "typesConvention": [143684, 143685, 143686, 143687],
-                "secteursActivite": params_recherche["secteursActivite"],
-                "lieux": [711],
-                "nbResultatsParPage": 20,
-                "page": 0,
-                "avecNbOffreParDomaineMetier": False,
-            }
-            try:
-                # TEMPORAIRE — affiche le body envoyé et les clés de la réponse pour diagnostiquer la pagination
-                if not getattr(self, "_diag_pagination_logged", False):
-                    import json as _json
-                    logger.info("[APEC-PAGINATION] Body POST envoyé : %s", _json.dumps(payload, ensure_ascii=False))
-                    self._diag_pagination_logged = True
+            mots_cles = params_recherche["motsCles"]
+            offres_motcle = []
+            nb_pages = 0
 
-                time.sleep(self.delai)
-                response = self.session.post(
-                    API_REST_URL,
-                    json=payload,
-                    headers=headers_api,
-                    timeout=15,
-                )
-                if response.status_code != 200:
-                    logger.debug(
-                        "[APEC] API REST POST : HTTP %d pour '%s'",
-                        response.status_code, params_recherche["motsCles"],
+            for page_num in range(MAX_PAGES_APEC):
+                payload = {
+                    "motsCles": mots_cles,
+                    "typesConvention": [143684, 143685, 143686, 143687],
+                    "secteursActivite": params_recherche["secteursActivite"],
+                    "lieux": [711],
+                    "nbResultatsParPage": 20,
+                    "page": page_num,
+                    "avecNbOffreParDomaineMetier": False,
+                }
+                try:
+                    time.sleep(2)
+                    response = self.session.post(
+                        API_REST_URL,
+                        json=payload,
+                        headers=headers_api,
+                        timeout=15,
                     )
-                    return []
+                    if response.status_code != 200:
+                        logger.debug("[APEC] API REST HTTP %d — '%s' page %d",
+                                     response.status_code, mots_cles, page_num)
+                        break
 
-                data = response.json()
-                # TEMPORAIRE — affiche les clés racine de la réponse (pour trouver le champ "total")
-                if not getattr(self, "_diag_pagination_resp_logged", False):
-                    cles_et_types = {k: type(v).__name__ for k, v in data.items()} if isinstance(data, dict) else type(data).__name__
-                    logger.info("[APEC-PAGINATION] Clés réponse API : %s", cles_et_types)
-                    self._diag_pagination_resp_logged = True
-                resultats = (
-                    data.get("resultats", [])
-                    or data.get("offres", [])
-                    or data.get("results", [])
-                    or (data if isinstance(data, list) else [])
-                )
-                logger.info("[APEC] API REST '%s' : %d résultats", params_recherche["motsCles"], len(resultats))
-                offres.extend(self._parser_api(resultats))
+                    data = response.json()
+                    resultats = (
+                        data.get("resultats", [])
+                        or data.get("offres", [])
+                        or data.get("results", [])
+                        or (data if isinstance(data, list) else [])
+                    )
 
-            except Exception as e:
-                logger.debug("[APEC] API REST erreur pour '%s' : %s", params_recherche["motsCles"], e)
-                return []
+                    if not resultats:
+                        logger.info("[APEC] '%s' page %d : 0 résultats — fin de pagination",
+                                    mots_cles, page_num)
+                        break
+
+                    logger.info("[APEC] Page %d de '%s' : %d offres récupérées",
+                                page_num, mots_cles, len(resultats))
+                    offres_motcle.extend(self._parser_api(resultats))
+                    nb_pages += 1
+
+                    if len(resultats) < 20:
+                        break  # dernière page partielle
+
+                except Exception as e:
+                    logger.debug("[APEC] API REST erreur '%s' page %d : %s", mots_cles, page_num, e)
+                    break
+
+            logger.info("[APEC] Total '%s' : %d offres sur %d page(s)",
+                        mots_cles, len(offres_motcle), nb_pages)
+            offres.extend(offres_motcle)
 
         return offres
 
@@ -157,38 +166,31 @@ class ApecCollector(BaseCollector):
         from datetime import datetime, timedelta, timezone
 
         offres = []
-        date_limite = datetime.now(timezone.utc) - timedelta(days=14)
+        date_limite = datetime.now(timezone.utc) - timedelta(days=21)
         nb_ecartees_date = 0
 
-        # TEMPORAIRE — collecte les codes de contrat rencontrés pour enrichir le mapping
-        codes_contrats_vus: dict[str, int] = {}
-
-        # Mapping des codes de type de contrat APEC → libellé lisible
         CONTRATS_APEC = {
+            # Codes typesConvention (paramètre de filtre URL)
             "143684": "CDI",
             "143685": "CDD",
             "143686": "Mission",
             "143687": "Freelance",
+            # Codes typeContrat (champ JSON de l'offre)
+            "101887": "CDD",
+            "101888": "CDI",
         }
 
-        # TEMPORAIRE — à retirer une fois confirmé que numIdOffre contient la lettre finale
-        if resultats and not getattr(self, "_diag_apec_logged", False):
-            import json as _json
-            logger.info("[APEC-DIAG] Premier résultat brut : %s", _json.dumps(resultats[0], ensure_ascii=False)[:800])
-            self._diag_apec_logged = True  # une seule fois par run
-
         for r in resultats:
-            # ── Filtre temporel : offres > 14 jours écartées ─────────────────
+            # ── Filtre temporel : offres > 21 jours écartées ─────────────────
             date_str = r.get("datePublication", "")
             if date_str:
                 try:
-                    # Format APEC : "2026-04-15T14:41:21.000+0000" — on prend les 10 premiers chars
                     date_pub = datetime.strptime(date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
                     if date_pub < date_limite:
                         nb_ecartees_date += 1
                         continue
                 except Exception:
-                    pass  # parsing impossible → on garde l'offre par sécurité
+                    pass
 
             # ── Titre — OBLIGATOIRE ───────────────────────────────────────────
             titre = (
@@ -226,9 +228,15 @@ class ApecCollector(BaseCollector):
                 type_contrat = type_contrat_raw.get("libelle", "CDI/CDD")
             else:
                 code = str(type_contrat_raw).strip()
-                type_contrat = CONTRATS_APEC.get(code, code or "CDI/CDD")
-                if code:  # TEMPORAIRE — collecte les codes pour enrichir le mapping
-                    codes_contrats_vus[code] = codes_contrats_vus.get(code, 0) + 1
+                type_contrat = CONTRATS_APEC.get(code)
+                if type_contrat is None:
+                    if code:
+                        if not hasattr(self, "_warned_codes"):
+                            self._warned_codes = set()
+                        if code not in self._warned_codes:
+                            logger.warning("[APEC] Code contrat inconnu : %s", code)
+                            self._warned_codes.add(code)
+                    type_contrat = code or "CDI/CDD"
 
             # ── Description — texteOffre contient la vraie description ─────────
             description = (
@@ -250,13 +258,8 @@ class ApecCollector(BaseCollector):
                 )
             )
 
-        logger.info("[APEC] Filtre temporel : %d offres écartées (>14 jours), %d conservées",
+        logger.info("[APEC] Filtre temporel : %d offres écartées (>21 jours), %d conservées",
                     nb_ecartees_date, len(offres))
-
-        # TEMPORAIRE — à retirer une fois le mapping de contrats complété
-        if codes_contrats_vus:
-            logger.info("[APEC-CONTRACTS] Codes typesConvention rencontrés : %s", codes_contrats_vus)
-
         return offres
 
     # ── Playwright fallback ───────────────────────────────────────────────────
