@@ -42,10 +42,18 @@ sources:
     url_base: "https://www.welcometothejungle.com"
     delai_secondes: 2
 
-  freelance_com:
+  free_work:
     active: true
+    nom: "Free-Work"
+    type: "scraping_html"
+    description: "Plateforme missions freelance tech-it (HTML statique, sans authentification)"
+    url_base: "https://www.free-work.com"
+    delai_secondes: 2
+
+  freelance_com:
+    active: false
     nom: "Freelance.com"
     type: "scraping"
-    description: "Plateforme de missions freelance"
+    description: "Plateforme de missions freelance (désactivé — URL 404, nécessite auth)"
     url_base: "https://www.freelance.com"
     delai_secondes: 3

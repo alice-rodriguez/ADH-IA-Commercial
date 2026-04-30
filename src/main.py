@@ -38,6 +38,7 @@ from src.collectors.boamp import BoampCollector
 from src.collectors.apec import ApecCollector
 from src.collectors.indeed import IndeedCollector
 from src.collectors.wtj import WTJCollector
+from src.collectors.free_work import FreeWorkCollector
 from src.collectors.freelance_com import FreelanceComCollector
 from src.filters import keyword_filter, ai_filter
 from src.matching.cv_parser import charger_tous_les_cvs
@@ -90,6 +91,7 @@ def construire_collecteurs(sources_cfg: dict) -> list:
         "apec":               ApecCollector,
         "indeed":             IndeedCollector,
         "welcometothejungle": WTJCollector,
+        "free_work":          FreeWorkCollector,
         "freelance_com":      FreelanceComCollector,
     }
     collecteurs = []
