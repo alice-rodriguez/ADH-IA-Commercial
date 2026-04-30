@@ -142,7 +142,19 @@ class ApecCollector(BaseCollector):
 
     def _parser_api(self, resultats: list) -> list[dict]:
         """Parse les résultats JSON de l'API interne APEC."""
+        import re
+        from datetime import datetime, timedelta, timezone
+
         offres = []
+        date_limite = datetime.now(timezone.utc) - timedelta(days=14)
+
+        # Mapping des codes de type de contrat APEC → libellé lisible
+        CONTRATS_APEC = {
+            "143684": "CDI",
+            "143685": "CDD",
+            "143686": "Mission",
+            "143687": "Freelance",
+        }
 
         # TEMPORAIRE — à retirer une fois confirmé que numIdOffre contient la lettre finale
         if resultats and not getattr(self, "_diag_apec_logged", False):
@@ -151,42 +163,61 @@ class ApecCollector(BaseCollector):
             self._diag_apec_logged = True  # une seule fois par run
 
         for r in resultats:
-            # L'API peut retourner les champs sous différentes clés selon la version
+            # ── Filtre temporel : offres > 14 jours écartées ─────────────────
+            date_str = r.get("datePublication", "")
+            if date_str:
+                try:
+                    # Format APEC : "2026-04-15T14:41:21.000+0000" — on prend les 10 premiers chars
+                    date_pub = datetime.strptime(date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                    if date_pub < date_limite:
+                        continue
+                except Exception:
+                    pass  # parsing impossible → on garde l'offre par sécurité
+
+            # ── Titre — OBLIGATOIRE ───────────────────────────────────────────
             titre = (
                 r.get("intitule") or r.get("titre") or r.get("title") or r.get("libelle", "")
             ).strip()
             if not titre:
                 continue
 
+            # ── Entreprise — APEC anonymise souvent ──────────────────────────
             entreprise = ""
-            soc = r.get("nomCommercial") or r.get("societe") or r.get("employer") or {}
+            soc = (
+                r.get("entreprise") or r.get("nomCommercial")
+                or r.get("societe") or r.get("employer") or {}
+            )
             if isinstance(soc, dict):
                 entreprise = soc.get("nom", "") or soc.get("name", "")
             elif isinstance(soc, str):
                 entreprise = soc
 
-            lieu = ""
-            loc = r.get("lieu") or r.get("localisation") or r.get("location") or {}
-            if isinstance(loc, dict):
-                lieu = loc.get("libelle", "") or loc.get("ville", "") or loc.get("label", "")
-            elif isinstance(loc, str):
-                lieu = loc
+            # ── Lieu — lieuTexte est la version lisible ("Nanterre - 92") ────
+            lieu = r.get("lieuTexte") or r.get("lieu") or r.get("localisation") or r.get("location") or ""
+            if isinstance(lieu, dict):
+                lieu = lieu.get("libelle", "") or lieu.get("ville", "") or lieu.get("label", "")
 
-            id_offre = str(r.get("numIdOffre") or r.get("id") or r.get("offerId") or "")
+            # ── ID complet avec lettre finale (ex: 178503733W) ────────────────
+            id_offre = str(r.get("numeroOffre") or r.get("numIdOffre") or r.get("id") or "")
             url = (
                 f"https://www.apec.fr/candidat/recherche-emploi.html/emploi/detail-offre/{id_offre}"
                 if id_offre else ""
             )
 
+            # ── Type de contrat — mapping codes numériques APEC ───────────────
             type_contrat_raw = r.get("typeContrat") or r.get("libelleTypeContrat") or {}
             if isinstance(type_contrat_raw, dict):
                 type_contrat = type_contrat_raw.get("libelle", "CDI/CDD")
             else:
-                type_contrat = str(type_contrat_raw) or "CDI/CDD"
+                code = str(type_contrat_raw).strip()
+                type_contrat = CONTRATS_APEC.get(code, code or "CDI/CDD")
 
-            description = r.get("texteHtml") or r.get("description") or r.get("accroche") or titre
+            # ── Description — texteOffre contient la vraie description ─────────
+            description = (
+                r.get("texteOffre") or r.get("texteHtml")
+                or r.get("description") or r.get("accroche") or titre
+            )
             if isinstance(description, str):
-                import re
                 description = re.sub(r"<[^>]+>", " ", description).strip()
 
             offres.append(
