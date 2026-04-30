@@ -15,6 +15,9 @@ profils:
   - "PMO"
   - "project manager"
   - "chargé de projet"
+  - "directeur de projet"
+  - "directeur de projets"
+  - "project director"
 
 # Secteurs d'activité ciblés
 secteurs:
@@ -65,9 +68,15 @@ mots_cles:
     - "BA"
     - "MOA"
     - "AMOA"
+    - "PMO"
     - "project manager"
     - "chargé de projet"
     - "responsable projet"
+    - "directeur de projet"
+    - "directeur de projets"
+    - "directrice de projet"
+    - "directrice de projets"
+    - "project director"
 
   # Au moins 1 mot-clé sectoriel doit être présent
   sectoriels:

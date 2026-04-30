@@ -7,7 +7,7 @@ Objectif : éliminer 70 à 80% des offres non pertinentes AVANT de faire appel
 Logique :
   - Au moins 1 mot-clé "requis" doit apparaître dans le titre + description
   - Au moins 1 mot-clé "sectoriel" doit apparaître
-  - Aucun mot-clé "exclu" ne doit apparaître
+  - Aucun mot-clé "exclu" ne doit apparaître dans le TITRE (pas la description)
   - Score = nombre de mots-clés trouvés (utilisé pour trier avant l'IA)
 """
 
@@ -24,6 +24,17 @@ def _normaliser_texte(texte: str) -> str:
     return texte.lower()
 
 
+def _normaliser_titre(titre: str) -> str:
+    """
+    Retire les parenthèses et leur contenu, normalise les espaces.
+    "Chef(fe) de projet" → "chef de projet"
+    "Directeur(trice)" → "directeur"
+    """
+    titre = re.sub(r'\([^)]*\)', '', titre)
+    titre = re.sub(r'\s+', ' ', titre).strip()
+    return titre.lower()
+
+
 def _contient(texte: str, mot: str) -> bool:
     """Vérifie si un mot ou expression apparaît dans le texte (mot entier ou expression)."""
     pattern = r"\b" + re.escape(mot.lower()) + r"\b"
@@ -38,8 +49,12 @@ def evaluer(offre: dict, criteres: dict) -> Tuple[bool, int, str]:
       (True, score, "")        → offre pertinente, passe à l'IA
       (False, 0, raison)       → offre rejetée définitivement
     """
-    texte = _normaliser_texte(
-        f"{offre.get('titre', '')} {offre.get('description', '')} {offre.get('entreprise', '')}"
+    # Titre normalisé (parenthèses retirées) — utilisé pour les exclusions
+    titre_norm = _normaliser_titre(offre.get('titre', ''))
+
+    # Texte complet (titre normalisé + description + entreprise) — pour requis et sectoriels
+    texte_complet = _normaliser_texte(
+        f"{titre_norm} {offre.get('description', '')} {offre.get('entreprise', '')}"
     )
 
     mots_cles = criteres.get("mots_cles", {})
@@ -48,29 +63,30 @@ def evaluer(offre: dict, criteres: dict) -> Tuple[bool, int, str]:
     boost     = [m.lower() for m in mots_cles.get("boost", [])]
     exclus    = [m.lower() for m in mots_cles.get("exclus", [])]
 
-    # Règle 1 — Mots exclus : rejet immédiat
+    # Règle 1 — Mots exclus : TITRE UNIQUEMENT (la description mentionne souvent
+    # "alternance" ou "stage" dans un contexte non-bloquant)
     for mot in exclus:
-        if _contient(texte, mot):
+        if _contient(titre_norm, mot):
             logger.debug("Offre rejetée (mot exclu '%s') : %s", mot, offre.get("titre"))
             return False, 0, f"mot-clé exclusion : {mot}"
 
-    # Règle 2 — Au moins 1 mot requis
-    a_requis = any(_contient(texte, m) for m in requis)
+    # Règle 2 — Au moins 1 mot requis (titre normalisé + description)
+    a_requis = any(_contient(texte_complet, m) for m in requis)
     if not a_requis:
         logger.debug("Offre rejetée (aucun mot requis) : %s", offre.get("titre"))
         return False, 0, "aucun mot-clé profil détecté"
 
-    # Règle 3 — Au moins 1 mot sectoriel
-    a_sectoriel = any(_contient(texte, m) for m in sectoriels)
+    # Règle 3 — Au moins 1 mot sectoriel (titre + description)
+    a_sectoriel = any(_contient(texte_complet, m) for m in sectoriels)
     if not a_sectoriel:
         logger.debug("Offre rejetée (aucun secteur) : %s", offre.get("titre"))
         return False, 0, "aucun secteur détecté"
 
     # Calcul du score
     score = 0
-    score += sum(1 for m in requis if _contient(texte, m))
-    score += sum(1 for m in sectoriels if _contient(texte, m))
-    score += sum(2 for m in boost if _contient(texte, m))  # Les mots boost valent double
+    score += sum(1 for m in requis if _contient(texte_complet, m))
+    score += sum(1 for m in sectoriels if _contient(texte_complet, m))
+    score += sum(2 for m in boost if _contient(texte_complet, m))  # Les mots boost valent double
 
     seuil = criteres.get("seuils", {}).get("score_pre_filtre_minimum", 2)
     if score < seuil:
