@@ -86,6 +86,8 @@ class FreeWorkCollector(BaseCollector):
 
     def _scraper_url(self, url_base: str, label: str) -> list[dict]:
         offres = []
+        _diag_fait = False  # TEMPORAIRE — diagnostic sélecteurs (1ère page, 1ère URL)
+
         for page_num in range(1, PAGES_MAX + 1):
             url = url_base if page_num == 1 else f"{url_base}&page={page_num}"
 
@@ -101,6 +103,25 @@ class FreeWorkCollector(BaseCollector):
                     break
 
                 soup = BeautifulSoup(resp.text, "lxml")
+
+                # TEMPORAIRE — diagnostic sélecteurs (1ère page de la 1ère URL uniquement)
+                if page_num == 1 and not _diag_fait:
+                    _diag_fait = True
+                    tous_a = soup.find_all("a", href=True)
+                    a_techit = [a for a in tous_a if "/fr/tech-it/" in (a.get("href") or "")]
+                    a_job = [a for a in tous_a if "/job-" in (a.get("href") or "")]
+                    a_les_deux = [a for a in tous_a if "/fr/tech-it/" in (a.get("href") or "") and "/job-" in (a.get("href") or "")]
+                    logger.info("[FW-DIAG] HTML : %d caractères", len(resp.text))
+                    logger.info("[FW-DIAG] Total <a> : %d", len(tous_a))
+                    logger.info("[FW-DIAG] <a> avec /fr/tech-it/ : %d", len(a_techit))
+                    logger.info("[FW-DIAG] <a> avec /job- : %d", len(a_job))
+                    logger.info("[FW-DIAG] <a> avec les deux : %d", len(a_les_deux))
+                    echantillon = [a.get("href", "") for a in tous_a[:10]]
+                    logger.info("[FW-DIAG] Échantillon de 10 hrefs :")
+                    for i, href in enumerate(echantillon, 1):
+                        logger.info("[FW-DIAG]   %d) %s", i, href)
+                # FIN TEMPORAIRE
+
                 cartes = soup.find_all(
                     "a", href=lambda h: h and "/fr/tech-it/" in h and "/job-" in h
                 )
