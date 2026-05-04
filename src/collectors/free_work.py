@@ -102,6 +102,26 @@ class FreeWorkCollector(BaseCollector):
 
                 soup = BeautifulSoup(resp.text, "lxml")
 
+                # TEMPORAIRE — inspecter pourquoi le filtre h3 rejette tout
+                if page_num == 1 and label == URLS_RECHERCHE[0][1]:
+                    tous_a = soup.find_all("a", href=lambda h: h and "/fr/tech-it/" in h and "/job-" in h)
+                    logger.info("[FW-DIAG2] Total <a> matchant : %d", len(tous_a))
+                    for i, a in enumerate(tous_a[:10]):
+                        logger.info(
+                            "[FW-DIAG2] <a> #%d: h3=%s h2=%s header=%s h3_select=%s classes=%s",
+                            i,
+                            a.find("h3") is not None,
+                            a.find("h2") is not None,
+                            a.find("header") is not None,
+                            bool(a.select("h3")),
+                            a.get("class", [])[:3],
+                        )
+                    grosses = [a for a in tous_a if any("rounded-lg" in c for c in a.get("class", []))]
+                    logger.info("[FW-DIAG2] <a> avec rounded-lg : %d", len(grosses))
+                    if grosses:
+                        logger.info("[FW-DIAG2] HTML brut première grosse carte :\n%s", str(grosses[0])[:1500])
+                # FIN TEMPORAIRE
+
                 # Deux <a> par offre partagent le même href : un mini (icône seule)
                 # et un grand (carte complète avec <h3>). On garde uniquement les grands.
                 cartes = [
