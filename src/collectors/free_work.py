@@ -130,7 +130,13 @@ class FreeWorkCollector(BaseCollector):
                     logger.info("[Free-Work] '%s' page %d : 0 carte — fin de pagination", label, page_num)
                     break
 
-                nouvelles = [o for o in (self._parser_carte(c) for c in cartes) if o]
+                nouvelles = []
+                for idx, carte in enumerate(cartes):
+                    # TEMPORAIRE — debug parsing des 3 premières cartes, 1ère page seulement
+                    debug = (page_num == 1 and idx < 3 and label == URLS_RECHERCHE[0][1])
+                    offre = self._parser_carte(carte, debug=debug)
+                    if offre:
+                        nouvelles.append(offre)
                 logger.info("[Free-Work] Page %d de '%s' : %d offres extraites", page_num, label, len(nouvelles))
                 offres.extend(nouvelles)
 
@@ -142,33 +148,43 @@ class FreeWorkCollector(BaseCollector):
 
     # ── Parsing d'une carte ───────────────────────────────────────────────────
 
-    def _parser_carte(self, carte) -> dict | None:
+    def _parser_carte(self, carte, debug: bool = False) -> dict | None:  # TEMPORAIRE: debug param
         try:
             # ── URL + source_id — OBLIGATOIRES ───────────────────────────────────
             href = carte.get("href", "")
             if not href:
+                if debug:
+                    logger.info("[FW-CARD-DEBUG] REJET : href vide")
                 return None
             url = BASE_URL + href
             source_id = href.rstrip("/").split("/")[-1]
+            if debug:
+                logger.info("[FW-CARD-DEBUG] url : '%s'", url)
 
             # ── Titre — OBLIGATOIRE ───────────────────────────────────────────────
-            # h3 contient un span.fw-text-highlight (titre réel) + un sous-titre
-            # "Mission freelance" — on prend uniquement le span du titre
             h3 = carte.find("h3")
             if not h3:
+                if debug:
+                    logger.info("[FW-CARD-DEBUG] REJET : pas de <h3> | HTML : %s", str(carte)[:500])
                 return None
             titre_span = h3.find("span", class_="fw-text-highlight")
             titre = titre_span.get_text(strip=True) if titre_span else h3.get_text(strip=True)
+            if debug:
+                logger.info("[FW-CARD-DEBUG] titre extrait : '%s'", titre)
             if not titre:
+                if debug:
+                    logger.info("[FW-CARD-DEBUG] REJET : titre vide | HTML h3 : %s", str(h3)[:500])
                 return None
 
             # ── Type de contrat ───────────────────────────────────────────────────
-            type_contrat = "Freelance"  # Free-Work est majoritairement freelance
+            type_contrat = "Freelance"
             for span in carte.find_all("span"):
                 texte_span = span.get_text(strip=True).lower()
                 if texte_span in CONTRATS_FW:
                     type_contrat = CONTRATS_FW[texte_span]
                     break
+            if debug:
+                logger.info("[FW-CARD-DEBUG] type_contrat : '%s'", type_contrat)
 
             # ── Entreprise ────────────────────────────────────────────────────────
             entreprise = ""
@@ -177,19 +193,26 @@ class FreeWorkCollector(BaseCollector):
             )
             if div_ent:
                 entreprise = div_ent.get_text(strip=True)
+            if debug:
+                logger.info("[FW-CARD-DEBUG] entreprise : '%s'", entreprise)
 
             # ── Localisation ──────────────────────────────────────────────────────
             lieu = ""
             span_title = carte.find("span", title=True)
             if span_title:
                 lieu = span_title["title"]
+            if debug:
+                logger.info("[FW-CARD-DEBUG] lieu : '%s'", lieu)
 
             # ── Date de publication ───────────────────────────────────────────────
             date_pub = None
             time_tag = carte.find("time")
-            if time_tag:
+            date_str = time_tag.get_text(strip=True) if time_tag else ""
+            if debug:
+                logger.info("[FW-CARD-DEBUG] date_str : '%s'", date_str)
+            if date_str:
                 try:
-                    date_pub = datetime.strptime(time_tag.get_text(strip=True), "%d/%m/%Y")
+                    date_pub = datetime.strptime(date_str, "%d/%m/%Y")
                 except ValueError:
                     pass
 
@@ -209,6 +232,8 @@ class FreeWorkCollector(BaseCollector):
             if tags:
                 suffix = f"Compétences : {', '.join(tags)}"
                 description = f"{description} | {suffix}" if description else suffix
+            if debug:
+                logger.info("[FW-CARD-DEBUG] description (50 premiers chars) : '%s'", description[:50])
 
             # ── Construction de l'offre ───────────────────────────────────────────
             offre = self.normaliser(
@@ -229,7 +254,8 @@ class FreeWorkCollector(BaseCollector):
             return offre
 
         except Exception as e:
-            logger.debug("[Free-Work] Erreur parsing carte : %s", e)
+            logger.error("[FW-CARD-DEBUG] EXCEPTION carte : %s", e, exc_info=True)  # TEMPORAIRE
+            logger.info("[FW-CARD-DEBUG] HTML brut de la carte :\n%s", str(carte)[:1000])  # TEMPORAIRE
             return None
 
     # ── Déduplication par URL (même offre peut apparaître dans plusieurs recherches)
