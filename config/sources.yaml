@@ -27,7 +27,7 @@ sources:
       - "https://www.apec.fr/candidat/recherche-emploi.html/emploi?motsCles=moa&typesConvention=143684&typesConvention=143685&typesConvention=143686&typesConvention=143687&secteursActivite=101757&teletravailFrequence=FULL_REMOTE&typesTeletravail=20767"
 
   indeed:
-    active: true
+    active: false
     nom: "Indeed France"
     type: "scraping"
     description: "Indeed — moteur d'offres d'emploi"

@@ -83,6 +83,10 @@ class ApecCollector(BaseCollector):
             # Codes typeContrat (champ JSON de l'offre)
             "101887": "CDD",
             "101888": "CDI",
+            # Codes observés en mai 2026 — signification non confirmée
+            # TODO: identifier après inspection manuelle d'une offre APEC
+            "597137": "Inconnu - à classifier",
+            "597139": "Inconnu - à classifier",
         }
 
         for r in resultats:
