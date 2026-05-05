@@ -102,116 +102,14 @@ class FreeWorkCollector(BaseCollector):
 
                 soup = BeautifulSoup(resp.text, "lxml")
 
-                # TEMPORAIRE — inspecter pourquoi le filtre h3 rejette tout
-                if page_num == 1 and label == URLS_RECHERCHE[0][1]:
-                    tous_a = soup.find_all("a", href=lambda h: h and "/fr/tech-it/" in h and "/job-" in h)
-                    logger.info("[FW-DIAG2] Total <a> matchant : %d", len(tous_a))
-                    for i, a in enumerate(tous_a[:10]):
-                        logger.info(
-                            "[FW-DIAG2] <a> #%d: h3=%s h2=%s header=%s h3_select=%s classes=%s",
-                            i,
-                            a.find("h3") is not None,
-                            a.find("h2") is not None,
-                            a.find("header") is not None,
-                            bool(a.select("h3")),
-                            a.get("class", [])[:3],
-                        )
-                    grosses = [a for a in tous_a if any("rounded-lg" in c for c in a.get("class", []))]
-                    logger.info("[FW-DIAG2] <a> avec rounded-lg : %d", len(grosses))
-                    if grosses:
-                        logger.info("[FW-DIAG2] HTML brut première grosse carte :\n%s", str(grosses[0])[:1500])
-                # FIN TEMPORAIRE
-
-                # ============================================================
-                # BLOC DIAGNOSTIC TEMPORAIRE — À SUPPRIMER APRÈS VALIDATION
-                # ============================================================
-                if page_num == 1 and label == URLS_RECHERCHE[0][1]:
-                    liens_job = soup.find_all("a", href=lambda h: h and "/job-mission/" in h)
-                    logger.info("[FW-DIAG3] Nombre de <a href='/job-mission/'> : %d", len(liens_job))
-
-                    # Compter les /job-mission/ en dehors du marquee # TEMPORAIRE
-                    liens_hors_marquee = []
-                    for lien in liens_job:
-                        ancetre = lien.parent
-                        dans_marquee = False
-                        while ancetre is not None:
-                            if ancetre.name == "fw-marquee":
-                                dans_marquee = True
-                                break
-                            ancetre = ancetre.parent
-                        if not dans_marquee:
-                            liens_hors_marquee.append(lien)
-                    logger.info("[FW-DIAG3] Liens /job-mission/ hors marquee : %d", len(liens_hors_marquee))
-                    for i, lien in enumerate(liens_hors_marquee[:5]):
-                        logger.info("[FW-DIAG3] Hors-marquee #%d href=%s", i, lien.get("href", ""))
-
-                    # ============================================================
-                    # BLOC DIAGNOSTIC TEMPORAIRE FW-DIAG4 — À SUPPRIMER APRÈS VALIDATION
-                    # ============================================================
-                    if liens_hors_marquee:
-                        a_real = liens_hors_marquee[0]
-                        carte = None
-                        cible_tags = {"article", "li", "section"}
-                        cible_classes = ("card", "job", "result", "offer")
-                        cur = a_real.parent
-                        niveaux = 0
-                        while cur is not None and niveaux < 8:
-                            if cur.name in cible_tags:
-                                carte = cur
-                                break
-                            classes = cur.get("class", []) or []
-                            if any(any(mot in c.lower() for mot in cible_classes) for c in classes):
-                                carte = cur
-                                break
-                            cur = cur.parent
-                            niveaux += 1
-                        if carte is None:
-                            cur = a_real
-                            for _ in range(3):
-                                if cur.parent is not None:
-                                    cur = cur.parent
-                            carte = cur
-                        logger.info(
-                            "[FW-DIAG4] Container carte | tag=<%s> classes=%s",
-                            carte.name, carte.get("class", [])
-                        )
-                        logger.info("[FW-DIAG4] HTML carte (8000 chars) :\n%s", str(carte)[:8000])
-                        logger.info(
-                            "[FW-DIAG4] Texte carte (2000 chars) :\n%s",
-                            carte.get_text(separator=" | ", strip=True)[:2000]
-                        )
-                    # FIN FW-DIAG4
-
-                    if liens_job:
-                        a0 = liens_job[0]  # Premier lien uniquement # TEMPORAIRE
-                        logger.info("[FW-DIAG3] href : %s", a0.get("href", ""))
-                        logger.info("[FW-DIAG3] HTML <a> (500 chars) :\n%s", str(a0)[:500])
-
-                        p1 = a0.parent
-                        if p1:
-                            logger.info("[FW-DIAG3] parent | tag=<%s> classes=%s",
-                                        p1.name, p1.get("class", []))
-                            logger.info("[FW-DIAG3] HTML parent (1000 chars) :\n%s", str(p1)[:1000])
-
-                        p2 = p1.parent if p1 else None
-                        if p2:
-                            logger.info("[FW-DIAG3] grand-parent | tag=<%s> classes=%s",
-                                        p2.name, p2.get("class", []))
-                            logger.info("[FW-DIAG3] HTML grand-parent (2000 chars) :\n%s", str(p2)[:2000])
-
-                        p3 = p2.parent if p2 else None
-                        if p3:
-                            logger.info("[FW-DIAG3] arrière-grand-parent | tag=<%s> classes=%s",
-                                        p3.name, p3.get("class", []))
-                            logger.info("[FW-DIAG3] HTML arrière-grand-parent (6000 chars) :\n%s",
-                                        str(p3)[:6000])
-                # FIN BLOC DIAGNOSTIC TEMPORAIRE
-
-                # Deux <a> par offre partagent le même href : un mini (icône seule)
-                # et un grand (carte complète avec <h3>). On garde uniquement les grands.
+                # Chaque carte de résultat est un <div class="flex-1"> contenant
+                # un <h2> (titre) et un <a href="/job-mission/"> (lien). Le filtre
+                # h2 + lien exclut naturellement le marquee (pas de h2) et les
+                # autres div.flex-1 du site.
                 cartes = [
-                    a for a in soup.find_all("a", href=lambda h: h and "/fr/tech-it/" in h and "/job-" in h)
-                    if a.find("h3")
+                    c for c in soup.find_all("div", class_="flex-1")
+                    if c.find("h2")
+                    and c.find("a", href=lambda h: h and "/job-mission/" in h)
                 ]
 
                 if not cartes:
@@ -232,38 +130,44 @@ class FreeWorkCollector(BaseCollector):
 
     def _parser_carte(self, carte) -> dict | None:
         try:
-            # ── URL + source_id — OBLIGATOIRES ───────────────────────────────────
-            href = carte.get("href", "")
+            # ── Titre + URL + source_id — OBLIGATOIRES ────────────────────────────
+            # Le <h2> contient un <a href="/job-mission/..."> dont le texte (ou son
+            # span.fw-text-highlight) est le titre réel. Le <a> couvre toute la carte
+            # via CSS "after:absolute after:inset-0" mais n'englobe pas le <h2> dans
+            # le DOM : ils sont frères.
+            h2 = carte.find("h2")
+            if not h2:
+                return None
+            lien_titre = h2.find("a", href=lambda h: h and "/job-mission/" in h)
+            if not lien_titre:
+                return None
+            href = lien_titre.get("href", "")
             if not href:
                 return None
             url = BASE_URL + href
             source_id = href.rstrip("/").split("/")[-1]
-
-            # ── Titre — OBLIGATOIRE ───────────────────────────────────────────────
-            # h3 contient un span.fw-text-highlight (titre réel) + sous-titre contrat
-            h3 = carte.find("h3")
-            if not h3:
-                return None
-            titre_span = h3.find("span", class_="fw-text-highlight")
-            titre = titre_span.get_text(strip=True) if titre_span else h3.get_text(strip=True)
+            titre_span = lien_titre.find("span", class_="fw-text-highlight")
+            titre = titre_span.get_text(strip=True) if titre_span else lien_titre.get_text(strip=True)
             if not titre:
                 return None
 
             # ── Type de contrat ───────────────────────────────────────────────────
+            # Les badges contrat ont un div.truncate avec le libellé exact.
+            # Protection faux positifs : les compétences (SAP, JIRA…) et noms
+            # d'entreprise ne matchent jamais les clés de CONTRATS_FW.
+            # TODO Phase B : collecter tous les badges pour gérer "Freelance + CDI".
             type_contrat = "Freelance"
-            for span in carte.find_all("span"):
-                texte_span = span.get_text(strip=True).lower()
-                if texte_span in CONTRATS_FW:
-                    type_contrat = CONTRATS_FW[texte_span]
+            for div in carte.find_all("div", class_=lambda c: c and "truncate" in c):
+                texte = div.get_text(strip=True).lower()
+                if texte in CONTRATS_FW:
+                    type_contrat = CONTRATS_FW[texte]
                     break
 
             # ── Entreprise ────────────────────────────────────────────────────────
             entreprise = ""
-            div_ent = carte.find(
-                "div", class_=lambda c: c and "font-medium" in c and "truncate" in c
-            )
-            if div_ent:
-                entreprise = div_ent.get_text(strip=True)
+            div_bold = carte.find("div", class_=lambda c: c and "font-bold" in c)
+            if div_bold:
+                entreprise = div_bold.get_text(strip=True)
 
             # ── Localisation ──────────────────────────────────────────────────────
             lieu = ""
@@ -280,19 +184,23 @@ class FreeWorkCollector(BaseCollector):
                 except ValueError:
                     pass
 
-            # ── Description (résumé) + tags compétences ───────────────────────────
+            # ── Description ───────────────────────────────────────────────────────
             description = ""
             div_desc = carte.find(
-                "div", class_=lambda c: c and "fw-text-highlight" in c and "line-clamp-3" in c
+                "div", class_=lambda c: c and "fw-text-highlight" in c and "line-clamp-4" in c
             )
             if div_desc:
                 description = div_desc.get_text(strip=True)
 
-            tags = [
-                s.get_text(strip=True)
-                for s in carte.find_all("span", class_=lambda c: c and "bg-brand-75" in c)
-                if s.get_text(strip=True)
-            ]
+            # ── Compétences/tags ──────────────────────────────────────────────────
+            # Les tags sont dans des <a class="bg-brand-75 ..."> ; le texte du titre
+            # du tag est dans leur span.fw-text-highlight.
+            tags = []
+            for tag_a in carte.find_all("a", class_=lambda c: c and "bg-brand-75" in c):
+                span_tag = tag_a.find("span", class_="fw-text-highlight")
+                texte_tag = span_tag.get_text(strip=True) if span_tag else tag_a.get_text(strip=True)
+                if texte_tag:
+                    tags.append(texte_tag)
             if tags:
                 suffix = f"Compétences : {', '.join(tags)}"
                 description = f"{description} | {suffix}" if description else suffix
