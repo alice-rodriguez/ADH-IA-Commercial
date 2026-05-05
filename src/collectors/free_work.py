@@ -145,6 +145,43 @@ class FreeWorkCollector(BaseCollector):
                     for i, lien in enumerate(liens_hors_marquee[:5]):
                         logger.info("[FW-DIAG3] Hors-marquee #%d href=%s", i, lien.get("href", ""))
 
+                    # ============================================================
+                    # BLOC DIAGNOSTIC TEMPORAIRE FW-DIAG4 — À SUPPRIMER APRÈS VALIDATION
+                    # ============================================================
+                    if liens_hors_marquee:
+                        a_real = liens_hors_marquee[0]
+                        carte = None
+                        cible_tags = {"article", "li", "section"}
+                        cible_classes = ("card", "job", "result", "offer")
+                        cur = a_real.parent
+                        niveaux = 0
+                        while cur is not None and niveaux < 8:
+                            if cur.name in cible_tags:
+                                carte = cur
+                                break
+                            classes = cur.get("class", []) or []
+                            if any(any(mot in c.lower() for mot in cible_classes) for c in classes):
+                                carte = cur
+                                break
+                            cur = cur.parent
+                            niveaux += 1
+                        if carte is None:
+                            cur = a_real
+                            for _ in range(3):
+                                if cur.parent is not None:
+                                    cur = cur.parent
+                            carte = cur
+                        logger.info(
+                            "[FW-DIAG4] Container carte | tag=<%s> classes=%s",
+                            carte.name, carte.get("class", [])
+                        )
+                        logger.info("[FW-DIAG4] HTML carte (8000 chars) :\n%s", str(carte)[:8000])
+                        logger.info(
+                            "[FW-DIAG4] Texte carte (2000 chars) :\n%s",
+                            carte.get_text(separator=" | ", strip=True)[:2000]
+                        )
+                    # FIN FW-DIAG4
+
                     if liens_job:
                         a0 = liens_job[0]  # Premier lien uniquement # TEMPORAIRE
                         logger.info("[FW-DIAG3] href : %s", a0.get("href", ""))
