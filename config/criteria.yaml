@@ -117,6 +117,26 @@ mots_cles:
     - "épargne"
     - "prévoyance"
     - "réassurance"
+    # Vocabulaire enrichi mai 2026 — banque/finance
+    # Banque d'investissement / financement
+    - "cash management"
+    - "financements structurés"
+    - "financement structuré"
+    - "banque d'investissement"
+    - "banque privée"
+    - "salle de marché"
+    - "investment banking"
+    - "capital market"
+    - "BFI"
+    # Paiements / monétique
+    - "monétique"
+    - "moyens de paiement"
+    - "paiements"
+    # Réglementation financière
+    - "Solvabilité II"
+    - "MiFID"
+    - "Bâle III"
+    - "FATCA"
 
   # Ces mots augmentent le score (mais ne sont pas obligatoires)
   boost:
