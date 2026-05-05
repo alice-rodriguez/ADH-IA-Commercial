@@ -122,6 +122,37 @@ class FreeWorkCollector(BaseCollector):
                         logger.info("[FW-DIAG2] HTML brut première grosse carte :\n%s", str(grosses[0])[:1500])
                 # FIN TEMPORAIRE
 
+                # ============================================================
+                # BLOC DIAGNOSTIC TEMPORAIRE — À SUPPRIMER APRÈS VALIDATION
+                # ============================================================
+                if page_num == 1 and label == URLS_RECHERCHE[0][1]:
+                    liens_job = soup.find_all("a", href=lambda h: h and "/job-mission/" in h)
+                    logger.info("[FW-DIAG3] Nombre de <a href='/job-mission/'> : %d", len(liens_job))
+                    if liens_job:
+                        a0 = liens_job[0]  # Premier lien uniquement # TEMPORAIRE
+                        logger.info("[FW-DIAG3] href : %s", a0.get("href", ""))
+                        logger.info("[FW-DIAG3] HTML <a> (500 chars) :\n%s", str(a0)[:500])
+
+                        p1 = a0.parent
+                        if p1:
+                            logger.info("[FW-DIAG3] parent | tag=<%s> classes=%s",
+                                        p1.name, p1.get("class", []))
+                            logger.info("[FW-DIAG3] HTML parent (1000 chars) :\n%s", str(p1)[:1000])
+
+                        p2 = p1.parent if p1 else None
+                        if p2:
+                            logger.info("[FW-DIAG3] grand-parent | tag=<%s> classes=%s",
+                                        p2.name, p2.get("class", []))
+                            logger.info("[FW-DIAG3] HTML grand-parent (2000 chars) :\n%s", str(p2)[:2000])
+
+                        p3 = p2.parent if p2 else None
+                        if p3:
+                            logger.info("[FW-DIAG3] arrière-grand-parent | tag=<%s> classes=%s",
+                                        p3.name, p3.get("class", []))
+                            logger.info("[FW-DIAG3] HTML arrière-grand-parent (6000 chars) :\n%s",
+                                        str(p3)[:6000])
+                # FIN BLOC DIAGNOSTIC TEMPORAIRE
+
                 # Deux <a> par offre partagent le même href : un mini (icône seule)
                 # et un grand (carte complète avec <h3>). On garde uniquement les grands.
                 cartes = [
