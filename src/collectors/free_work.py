@@ -128,6 +128,23 @@ class FreeWorkCollector(BaseCollector):
                 if page_num == 1 and label == URLS_RECHERCHE[0][1]:
                     liens_job = soup.find_all("a", href=lambda h: h and "/job-mission/" in h)
                     logger.info("[FW-DIAG3] Nombre de <a href='/job-mission/'> : %d", len(liens_job))
+
+                    # Compter les /job-mission/ en dehors du marquee # TEMPORAIRE
+                    liens_hors_marquee = []
+                    for lien in liens_job:
+                        ancetre = lien.parent
+                        dans_marquee = False
+                        while ancetre is not None:
+                            if ancetre.name == "fw-marquee":
+                                dans_marquee = True
+                                break
+                            ancetre = ancetre.parent
+                        if not dans_marquee:
+                            liens_hors_marquee.append(lien)
+                    logger.info("[FW-DIAG3] Liens /job-mission/ hors marquee : %d", len(liens_hors_marquee))
+                    for i, lien in enumerate(liens_hors_marquee[:5]):
+                        logger.info("[FW-DIAG3] Hors-marquee #%d href=%s", i, lien.get("href", ""))
+
                     if liens_job:
                         a0 = liens_job[0]  # Premier lien uniquement # TEMPORAIRE
                         logger.info("[FW-DIAG3] href : %s", a0.get("href", ""))
