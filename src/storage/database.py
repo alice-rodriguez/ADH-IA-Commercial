@@ -1,8 +1,8 @@
 """
 Base de données SQLite — stockage des offres et déduplication.
 
-Rôle : mémoriser toutes les offres collectées pour éviter d'envoyer
-deux fois la même offre dans la fenêtre de déduplication (7 jours par défaut).
+Rôle : mémoriser toutes les offres collectées, gérer la déduplication,
+et exposer les données à l'interface web (favoris, notes, statuts).
 """
 
 import sqlite3
@@ -21,6 +21,7 @@ def _connexion() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
@@ -29,25 +30,51 @@ def initialiser():
     with _connexion() as conn:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS offres (
-                id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                hash            TEXT    UNIQUE NOT NULL,
-                titre           TEXT,
-                entreprise      TEXT,
-                lieu            TEXT,
-                type_contrat    TEXT,
-                source          TEXT,
-                url             TEXT,
-                description     TEXT,
-                resume_ia       TEXT,
-                score_ia        INTEGER,
-                date_collecte   TEXT    NOT NULL,
-                date_envoi      TEXT,
-                envoyee         INTEGER DEFAULT 0
+                id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                hash                  TEXT    UNIQUE NOT NULL,
+                titre                 TEXT,
+                entreprise            TEXT,
+                lieu                  TEXT,
+                type_contrat          TEXT,
+                type_contrat_clarifie TEXT,
+                source                TEXT,
+                url                   TEXT,
+                description           TEXT,
+                resume_ia             TEXT,
+                score_ia              INTEGER,
+                tjm_min               INTEGER,
+                tjm_max               INTEGER,
+                salaire_min           INTEGER,
+                salaire_max           INTEGER,
+                date_collecte         TEXT    NOT NULL,
+                date_envoi            TEXT,
+                envoyee               INTEGER DEFAULT 0
+            );
+
+            CREATE TABLE IF NOT EXISTS actions_utilisateur (
+                offre_id          INTEGER PRIMARY KEY,
+                vue               INTEGER DEFAULT 0,
+                favori            INTEGER DEFAULT 0,
+                statut            TEXT    DEFAULT 'nouveau',
+                notes             TEXT,
+                date_modification TEXT    DEFAULT (datetime('now')),
+                FOREIGN KEY (offre_id) REFERENCES offres(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS competences_offre (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                offre_id    INTEGER NOT NULL,
+                competence  TEXT    NOT NULL,
+                UNIQUE(offre_id, competence),
+                FOREIGN KEY (offre_id) REFERENCES offres(id) ON DELETE CASCADE
             );
 
             CREATE INDEX IF NOT EXISTS idx_hash          ON offres(hash);
             CREATE INDEX IF NOT EXISTS idx_date_collecte ON offres(date_collecte);
             CREATE INDEX IF NOT EXISTS idx_envoyee       ON offres(envoyee);
+            CREATE INDEX IF NOT EXISTS idx_score_ia      ON offres(score_ia);
+            CREATE INDEX IF NOT EXISTS idx_statut        ON actions_utilisateur(statut);
+            CREATE INDEX IF NOT EXISTS idx_competence    ON competences_offre(competence);
         """)
     logger.info("Base de données prête : %s", DB_PATH)
 
