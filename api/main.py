@@ -9,7 +9,10 @@ Lancement local :
     uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+
+from api.database import get_offres_recentes
+from api.schemas import Offre
 
 VERSION = "0.1.0"
 
@@ -27,3 +30,11 @@ def health():
         "service": "adh-veille-api",
         "version": VERSION,
     }
+
+
+@app.get("/api/offres", response_model=list[Offre])
+def liste_offres():
+    try:
+        return get_offres_recentes(jours=30)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur base de données : {e}")
