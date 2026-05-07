@@ -65,3 +65,51 @@ def get_offres_recentes(jours: int = 30) -> list[dict]:
         }
         for row in rows
     ]
+
+
+_SELECT_OFFRE = """
+    SELECT
+        o.id,
+        o.titre,
+        o.entreprise,
+        o.lieu,
+        o.type_contrat,
+        o.type_contrat_clarifie,
+        o.source,
+        o.url,
+        o.description,
+        o.resume_ia,
+        o.score_ia,
+        o.tjm_min,
+        o.tjm_max,
+        o.salaire_min,
+        o.salaire_max,
+        o.date_collecte,
+        COALESCE(a.vue, 0)            AS vue,
+        COALESCE(a.favori, 0)         AS favori,
+        COALESCE(a.statut, 'nouveau') AS statut,
+        a.notes                       AS notes
+    FROM offres o
+    LEFT JOIN actions_utilisateur a ON a.offre_id = o.id
+"""
+
+
+def get_offre_par_id(offre_id: int) -> dict | None:
+    """
+    Retourne UNE offre par son id, avec actions_utilisateur jointes.
+    Retourne None si l'offre n'existe pas.
+    Pas de filtre temporel — accessible même si > 30 jours.
+    """
+    with _connexion() as conn:
+        row = conn.execute(
+            _SELECT_OFFRE + "WHERE o.id = ?",
+            (offre_id,),
+        ).fetchone()
+
+    if row is None:
+        return None
+    return {
+        **dict(row),
+        "vue": bool(row["vue"]),
+        "favori": bool(row["favori"]),
+    }

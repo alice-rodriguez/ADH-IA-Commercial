@@ -11,7 +11,7 @@ Lancement local :
 
 from fastapi import FastAPI, HTTPException
 
-from api.database import get_offres_recentes
+from api.database import get_offre_par_id, get_offres_recentes
 from api.schemas import Offre
 
 VERSION = "0.1.0"
@@ -36,5 +36,18 @@ def health():
 def liste_offres():
     try:
         return get_offres_recentes(jours=30)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur base de données : {e}")
+
+
+@app.get("/api/offres/{offre_id}", response_model=Offre)
+def detail_offre(offre_id: int):
+    try:
+        offre = get_offre_par_id(offre_id)
+        if offre is None:
+            raise HTTPException(status_code=404, detail=f"Offre {offre_id} non trouvée")
+        return offre
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur base de données : {e}")
