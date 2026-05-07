@@ -116,34 +116,6 @@ class FreeWorkCollector(BaseCollector):
                     logger.info("[Free-Work] '%s' page %d : 0 carte — fin de pagination", label, page_num)
                     break
 
-                # ============================================================
-                # BLOC DIAGNOSTIC TEMPORAIRE FW-DIAG5 — À SUPPRIMER APRÈS A.3.2
-                # ============================================================
-                if page_num == 1 and not getattr(self, "_diag5_logged", False):
-                    self._diag5_logged = True
-                    carte_diag = None
-                    for c in cartes:
-                        badge_premium = c.find(
-                            lambda tag: tag.name == "div"
-                            and any("bg-brand" in cls for cls in tag.get("class") or [])
-                            and "Offre premium" in tag.get_text()
-                        )
-                        if not badge_premium:
-                            carte_diag = c
-                            break
-                    if carte_diag is None:
-                        logger.info("[FW-DIAG5] Aucune carte non-premium sur cette page")
-                    else:
-                        lien_diag = carte_diag.find("a", href=lambda h: h and "/job-mission/" in h)
-                        href_diag = lien_diag.get("href", "") if lien_diag else "(lien non trouvé)"
-                        logger.info("[FW-DIAG5] href : %s", href_diag)
-                        logger.info("[FW-DIAG5] HTML brut :\n%s", str(carte_diag)[:8000])
-                        logger.info("[FW-DIAG5] Texte épuré :\n%s",
-                                    carte_diag.get_text(separator=" | ", strip=True)[:2500])
-                # ============================================================
-                # FIN BLOC DIAGNOSTIC TEMPORAIRE FW-DIAG5
-                # ============================================================
-
                 nouvelles = [o for o in (self._parser_carte(c) for c in cartes) if o]
                 logger.info("[Free-Work] Page %d de '%s' : %d offres extraites", page_num, label, len(nouvelles))
                 offres.extend(nouvelles)
