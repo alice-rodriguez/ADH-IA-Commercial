@@ -1,5 +1,20 @@
 import type { Offre } from '../types'
 
+const CONTRAT_COLORS: Array<[RegExp, string]> = [
+  [/freelance|indépendant|independant/i, 'bg-adh-orange text-white'],
+  [/cdi/i,                                'bg-green-500 text-white'],
+  [/cdd/i,                                'bg-adh-violet text-adh-black'],
+  [/stage|alternance|apprentissage/i,     'bg-blue-300 text-adh-black'],
+]
+
+function contratBadgeClass(contrat: string | null): string {
+  if (!contrat) return 'bg-gray-300 text-adh-black'
+  for (const [regex, classes] of CONTRAT_COLORS) {
+    if (regex.test(contrat)) return classes
+  }
+  return 'bg-gray-300 text-adh-black'
+}
+
 const SOURCE_COLORS: Record<string, string> = {
   'APEC': 'bg-blue-500 text-white',
   'Free-Work': 'bg-orange-400 text-white',
@@ -59,7 +74,7 @@ export default function OffreCard({ offre }: Props) {
       {/* Métadonnées */}
       <div className="flex flex-wrap items-center gap-2 text-sm">
         {offre.type_contrat && (
-          <span className="bg-adh-violet text-adh-black text-xs font-medium px-2 py-0.5 rounded-full">
+          <span className={`${contratBadgeClass(offre.type_contrat_clarifie || offre.type_contrat)} text-xs font-medium px-2 py-0.5 rounded-full`}>
             {offre.type_contrat_clarifie || offre.type_contrat}
           </span>
         )}
