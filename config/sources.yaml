@@ -34,8 +34,12 @@ sources:
     url_base: "https://fr.indeed.com"
     delai_secondes: 5
 
+  # Désactivé depuis mai 2026 : anti-bot AWS WAF / CloudFront bloque toutes
+  # les requêtes (HTTP 403 systématique même avec User-Agent et headers
+  # Sec-Fetch valides). Code conservé dans src/collectors/wtj.py pour
+  # réactivation future si WTJ assouplit sa protection.
   welcometothejungle:
-    active: true
+    active: false
     nom: "Welcome to the Jungle"
     type: "scraping_html"
     description: "Pages emploi publiques (HTML statique, sans authentification)"
