@@ -12,8 +12,16 @@ Lancement local :
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.database import get_offre_par_id, get_offres_recentes
-from api.schemas import Offre
+from api.database import (
+    get_offre_par_id,
+    get_offres_recentes,
+    maj_favori,
+    maj_notes,
+    maj_statut,
+    marquer_vue,
+    offre_existe,
+)
+from api.schemas import FavoriUpdate, NotesUpdate, Offre, StatutUpdate
 
 VERSION = "0.1.0"
 
@@ -63,3 +71,65 @@ def detail_offre(offre_id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur base de données : {e}")
+
+
+def _verifier_et_recharger(offre_id: int) -> Offre:
+    """Vérifie l'existence + retourne l'offre rechargée."""
+    if not offre_existe(offre_id):
+        raise HTTPException(404, f"Offre {offre_id} non trouvée")
+    offre = get_offre_par_id(offre_id)
+    if offre is None:  # race condition très improbable
+        raise HTTPException(404, f"Offre {offre_id} non trouvée")
+    return offre
+
+
+@app.patch("/api/offres/{offre_id}/vue", response_model=Offre)
+def patch_vue(offre_id: int):
+    try:
+        if not offre_existe(offre_id):
+            raise HTTPException(404, f"Offre {offre_id} non trouvée")
+        marquer_vue(offre_id)
+        return _verifier_et_recharger(offre_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur base de données : {e}")
+
+
+@app.patch("/api/offres/{offre_id}/favori", response_model=Offre)
+def patch_favori(offre_id: int, body: FavoriUpdate):
+    try:
+        if not offre_existe(offre_id):
+            raise HTTPException(404, f"Offre {offre_id} non trouvée")
+        maj_favori(offre_id, body.favori)
+        return _verifier_et_recharger(offre_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur base de données : {e}")
+
+
+@app.patch("/api/offres/{offre_id}/statut", response_model=Offre)
+def patch_statut(offre_id: int, body: StatutUpdate):
+    try:
+        if not offre_existe(offre_id):
+            raise HTTPException(404, f"Offre {offre_id} non trouvée")
+        maj_statut(offre_id, body.statut)
+        return _verifier_et_recharger(offre_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur base de données : {e}")
+
+
+@app.patch("/api/offres/{offre_id}/notes", response_model=Offre)
+def patch_notes(offre_id: int, body: NotesUpdate):
+    try:
+        if not offre_existe(offre_id):
+            raise HTTPException(404, f"Offre {offre_id} non trouvée")
+        maj_notes(offre_id, body.notes)
+        return _verifier_et_recharger(offre_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur base de données : {e}")

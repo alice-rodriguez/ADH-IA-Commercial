@@ -2,7 +2,7 @@
 Modèles Pydantic pour la validation et la sérialisation des réponses API.
 """
 
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel
 
 
@@ -29,3 +29,21 @@ class Offre(BaseModel):
     favori: bool
     statut: str
     notes: Optional[str]
+
+
+class FavoriUpdate(BaseModel):
+    """Body du PATCH /api/offres/{id}/favori."""
+
+    favori: bool
+
+
+class StatutUpdate(BaseModel):
+    """Body du PATCH /api/offres/{id}/statut."""
+
+    statut: Literal["nouveau", "en_cours", "envoye", "rejete"]
+
+
+class NotesUpdate(BaseModel):
+    """Body du PATCH /api/offres/{id}/notes. None ou chaîne vide = effacer."""
+
+    notes: Optional[str] = None
