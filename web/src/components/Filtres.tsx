@@ -44,9 +44,10 @@ interface Props {
   filtres: FiltresState
   onChange: (filtres: FiltresState) => void
   nbAffichees: number
+  vues: Set<number>
 }
 
-export default function Filtres({ offres, filtres, onChange, nbAffichees }: Props) {
+export default function Filtres({ offres, filtres, onChange, nbAffichees, vues }: Props) {
   const sources = useMemo(() => {
     const set = new Set<string>()
     offres.forEach((o) => { if (o.source) set.add(o.source) })
@@ -61,6 +62,11 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees }: Prop
     })
     return Array.from(set).sort()
   }, [offres])
+
+  const nbNouvelles = useMemo(
+    () => offres.filter((o) => !vues.has(o.id)).length,
+    [offres, vues]
+  )
 
   function toggleSource(source: string) {
     const next = filtres.sources.includes(source)
@@ -157,6 +163,59 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees }: Prop
                 }`}
               >
                 {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Mots-clés */}
+        <div>
+          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Mots-clés</p>
+          <div className="relative">
+            <svg
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            </svg>
+            <input
+              type="text"
+              value={filtres.motsCles}
+              onChange={(e) => onChange({ ...filtres, motsCles: e.target.value })}
+              placeholder="SAP, MOA banque..."
+              className="w-56 pl-7 pr-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:border-adh-orange"
+            />
+          </div>
+        </div>
+
+        {/* Lieu */}
+        <div>
+          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Lieu</p>
+          <input
+            type="text"
+            value={filtres.lieu}
+            onChange={(e) => onChange({ ...filtres, lieu: e.target.value })}
+            placeholder="Paris, remote..."
+            className="w-40 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:border-adh-orange"
+          />
+        </div>
+
+        {/* Vues */}
+        <div>
+          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Vues</p>
+          <div className="flex gap-1">
+            {(['tout', 'nouvelles'] as const).map((val) => (
+              <button
+                key={val}
+                onClick={() => onChange({ ...filtres, toggleVues: val })}
+                className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors ${
+                  filtres.toggleVues === val
+                    ? 'bg-adh-orange text-white border-adh-orange'
+                    : 'bg-white text-adh-black border-gray-300 hover:border-adh-orange'
+                }`}
+              >
+                {val === 'tout' ? 'Tout' : `Nouvelles (${nbNouvelles})`}
               </button>
             ))}
           </div>

@@ -5,6 +5,9 @@ export interface FiltresState {
   contrats: string[]
   scoreMin: number | null
   periode: 'tout' | '7j' | '24h'
+  motsCles: string
+  lieu: string
+  toggleVues: 'tout' | 'nouvelles'
 }
 
 export const FILTRES_INITIAUX: FiltresState = {
@@ -12,9 +15,12 @@ export const FILTRES_INITIAUX: FiltresState = {
   contrats: [],
   scoreMin: null,
   periode: 'tout',
+  motsCles: '',
+  lieu: '',
+  toggleVues: 'tout',
 }
 
-export function filtrer(offres: Offre[], f: FiltresState): Offre[] {
+export function filtrer(offres: Offre[], f: FiltresState, vues: Set<number>): Offre[] {
   return offres.filter((o) => {
     if (f.sources.length > 0 && o.source && !f.sources.includes(o.source)) {
       return false
@@ -37,6 +43,18 @@ export function filtrer(offres: Offre[], f: FiltresState): Offre[] {
       const seuilMs = f.periode === '24h' ? 24 * 3600 * 1000 : 7 * 24 * 3600 * 1000
       if (diffMs > seuilMs) return false
     }
+
+    if (f.motsCles.trim()) {
+      const haystack = [o.titre, o.description, o.entreprise].join(' ').toLowerCase()
+      const mots = f.motsCles.trim().toLowerCase().split(/\s+/)
+      if (!mots.every((m) => haystack.includes(m))) return false
+    }
+
+    if (f.lieu.trim()) {
+      if (!o.lieu || !o.lieu.toLowerCase().includes(f.lieu.trim().toLowerCase())) return false
+    }
+
+    if (f.toggleVues === 'nouvelles' && vues.has(o.id)) return false
 
     return true
   })

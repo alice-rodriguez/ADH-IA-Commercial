@@ -5,12 +5,14 @@ import OffreCard from './components/OffreCard'
 import type { Offre } from './types'
 import { filtrer, FILTRES_INITIAUX } from './utils/filtrer'
 import type { FiltresState } from './utils/filtrer'
+import { useVues } from './utils/useVues'
 
 function App() {
   const [offres, setOffres] = useState<Offre[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filtres, setFiltres] = useState<FiltresState>(FILTRES_INITIAUX)
+  const [vues, markVue] = useVues()
 
   useEffect(() => {
     fetchOffres()
@@ -19,7 +21,7 @@ function App() {
       .finally(() => setLoading(false))
   }, [])
 
-  const offresFiltrees = useMemo(() => filtrer(offres, filtres), [offres, filtres])
+  const offresFiltrees = useMemo(() => filtrer(offres, filtres, vues), [offres, filtres, vues])
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -34,6 +36,7 @@ function App() {
           filtres={filtres}
           onChange={setFiltres}
           nbAffichees={offresFiltrees.length}
+          vues={vues}
         />
       )}
 
@@ -72,7 +75,12 @@ function App() {
         {!loading && !error && offresFiltrees.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {offresFiltrees.map((offre) => (
-              <OffreCard key={offre.id} offre={offre} />
+              <OffreCard
+                key={offre.id}
+                offre={offre}
+                onVoir={markVue}
+                déjaVue={vues.has(offre.id)}
+              />
             ))}
           </div>
         )}

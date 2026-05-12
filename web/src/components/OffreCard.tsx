@@ -45,11 +45,13 @@ function excerpt(offre: Offre): string {
 
 interface Props {
   offre: Offre
+  onVoir?: (id: number) => void
+  déjaVue?: boolean
 }
 
-export default function OffreCard({ offre }: Props) {
+export default function OffreCard({ offre, onVoir, déjaVue = false }: Props) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-md hover:shadow-lg transition-shadow p-5 flex flex-col gap-3">
+    <div className={`bg-white border border-gray-200 rounded-lg shadow-md hover:shadow-lg transition-shadow p-5 flex flex-col gap-3 ${déjaVue ? 'opacity-70' : ''}`}>
 
       {/* Ligne source + score */}
       <div className="flex items-start justify-between gap-2">
@@ -93,6 +95,7 @@ export default function OffreCard({ offre }: Props) {
           href={offre.url}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => onVoir?.(offre.id)}
           className="mt-auto inline-block text-sm font-semibold text-adh-orange hover:underline"
         >
           Voir l'offre →
