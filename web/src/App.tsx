@@ -1,12 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { fetchOffres } from './api'
+import Filtres from './components/Filtres'
 import OffreCard from './components/OffreCard'
 import type { Offre } from './types'
+import { filtrer, FILTRES_INITIAUX } from './utils/filtrer'
+import type { FiltresState } from './utils/filtrer'
 
 function App() {
   const [offres, setOffres] = useState<Offre[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [filtres, setFiltres] = useState<FiltresState>(FILTRES_INITIAUX)
 
   useEffect(() => {
     fetchOffres()
@@ -15,12 +19,23 @@ function App() {
       .finally(() => setLoading(false))
   }, [])
 
+  const offresFiltrees = useMemo(() => filtrer(offres, filtres), [offres, filtres])
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       <header className="bg-adh-black flex items-center gap-4 px-6 py-4">
         <img src="/picto-adh.png" alt="Pictogramme ADH" className="h-10" />
         <img src="/logo-adh.png" alt="Logo ADH" className="h-8" />
       </header>
+
+      {!loading && !error && offres.length > 0 && (
+        <Filtres
+          offres={offres}
+          filtres={filtres}
+          onChange={setFiltres}
+          nbAffichees={offresFiltrees.length}
+        />
+      )}
 
       <main className="flex-1 p-6 md:p-8">
         {loading && (
@@ -42,17 +57,24 @@ function App() {
           <p className="text-center text-gray-400 mt-16 text-lg">Aucune offre disponible pour le moment</p>
         )}
 
-        {!loading && !error && offres.length > 0 && (
-          <>
-            <h2 className="text-lg font-semibold text-adh-black mb-6">
-              {offres.length} offre{offres.length > 1 ? 's' : ''} collectée{offres.length > 1 ? 's' : ''}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {offres.map((offre) => (
-                <OffreCard key={offre.id} offre={offre} />
-              ))}
-            </div>
-          </>
+        {!loading && !error && offres.length > 0 && offresFiltrees.length === 0 && (
+          <div className="text-center mt-16">
+            <p className="text-gray-400 text-lg mb-3">Aucune offre ne correspond aux filtres</p>
+            <button
+              onClick={() => setFiltres(FILTRES_INITIAUX)}
+              className="text-sm font-semibold text-adh-orange hover:underline"
+            >
+              Réinitialiser les filtres
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && offresFiltrees.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {offresFiltrees.map((offre) => (
+              <OffreCard key={offre.id} offre={offre} />
+            ))}
+          </div>
         )}
       </main>
     </div>
