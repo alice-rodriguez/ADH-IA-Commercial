@@ -16,6 +16,13 @@ const CONTRAT_COLORS: Array<[RegExp, string]> = [
   [/stage|alternance|apprentissage/i,     'bg-blue-300 text-adh-black'],
 ]
 
+const STATUT_OPTIONS = [
+  { label: 'Nouveau',  value: 'nouveau',  classes: 'bg-gray-300 text-adh-black' },
+  { label: 'En cours', value: 'en_cours', classes: 'bg-blue-300 text-adh-black' },
+  { label: 'Envoyé',   value: 'envoye',   classes: 'bg-green-300 text-adh-black' },
+  { label: 'Rejeté',   value: 'rejete',   classes: 'bg-red-300 text-adh-black' },
+]
+
 function sourceBadgeClass(source: string): string {
   return SOURCE_COLORS[source] || 'bg-gray-400 text-white'
 }
@@ -44,10 +51,9 @@ interface Props {
   filtres: FiltresState
   onChange: (filtres: FiltresState) => void
   nbAffichees: number
-  vues: Set<number>
 }
 
-export default function Filtres({ offres, filtres, onChange, nbAffichees, vues }: Props) {
+export default function Filtres({ offres, filtres, onChange, nbAffichees }: Props) {
   const sources = useMemo(() => {
     const set = new Set<string>()
     offres.forEach((o) => { if (o.source) set.add(o.source) })
@@ -64,8 +70,8 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees, vues }
   }, [offres])
 
   const nbNouvelles = useMemo(
-    () => offres.filter((o) => !vues.has(o.id)).length,
-    [offres, vues]
+    () => offres.filter((o) => !o.vue).length,
+    [offres]
   )
 
   function toggleSource(source: string) {
@@ -80,6 +86,13 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees, vues }
       ? filtres.contrats.filter((c) => c !== contrat)
       : [...filtres.contrats, contrat]
     onChange({ ...filtres, contrats: next })
+  }
+
+  function toggleStatut(statut: string) {
+    const next = filtres.statuts.includes(statut)
+      ? filtres.statuts.filter((s) => s !== statut)
+      : [...filtres.statuts, statut]
+    onChange({ ...filtres, statuts: next })
   }
 
   const isFiltreActif = nbAffichees < offres.length
@@ -122,6 +135,26 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees, vues }
                 />
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${contratBadgeClass(ctr)}`}>
                   {ctr}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Statut */}
+        <div>
+          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Statut</p>
+          <div className="flex flex-wrap gap-2">
+            {STATUT_OPTIONS.map((opt) => (
+              <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filtres.statuts.includes(opt.value)}
+                  onChange={() => toggleStatut(opt.value)}
+                  className="w-3.5 h-3.5 accent-[#ff914d]"
+                />
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${opt.classes}`}>
+                  {opt.label}
                 </span>
               </label>
             ))}

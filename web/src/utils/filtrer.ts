@@ -3,6 +3,7 @@ import type { Offre } from '../types'
 export interface FiltresState {
   sources: string[]
   contrats: string[]
+  statuts: string[]
   scoreMin: number | null
   periode: 'tout' | '7j' | '24h'
   motsCles: string
@@ -13,6 +14,7 @@ export interface FiltresState {
 export const FILTRES_INITIAUX: FiltresState = {
   sources: [],
   contrats: [],
+  statuts: [],
   scoreMin: null,
   periode: 'tout',
   motsCles: '',
@@ -20,7 +22,7 @@ export const FILTRES_INITIAUX: FiltresState = {
   toggleVues: 'tout',
 }
 
-export function filtrer(offres: Offre[], f: FiltresState, vues: Set<number>): Offre[] {
+export function filtrer(offres: Offre[], f: FiltresState): Offre[] {
   return offres.filter((o) => {
     if (f.sources.length > 0 && o.source && !f.sources.includes(o.source)) {
       return false
@@ -31,6 +33,8 @@ export function filtrer(offres: Offre[], f: FiltresState, vues: Set<number>): Of
       const match = f.contrats.some((c) => new RegExp(c, 'i').test(ctr))
       if (!match) return false
     }
+
+    if (f.statuts.length > 0 && !f.statuts.includes(o.statut)) return false
 
     if (f.scoreMin !== null) {
       if (o.score_ia === null || o.score_ia < f.scoreMin) return false
@@ -54,7 +58,7 @@ export function filtrer(offres: Offre[], f: FiltresState, vues: Set<number>): Of
       if (!o.lieu || !o.lieu.toLowerCase().includes(f.lieu.trim().toLowerCase())) return false
     }
 
-    if (f.toggleVues === 'nouvelles' && vues.has(o.id)) return false
+    if (f.toggleVues === 'nouvelles' && o.vue) return false
 
     return true
   })
