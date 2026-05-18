@@ -74,6 +74,11 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees }: Prop
     [offres]
   )
 
+  const nbFavoris = useMemo(
+    () => offres.filter((o) => o.favori).length,
+    [offres]
+  )
+
   function toggleSource(source: string) {
     const next = filtres.sources.includes(source)
       ? filtres.sources.filter((s) => s !== source)
@@ -249,6 +254,26 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees }: Prop
                 }`}
               >
                 {val === 'tout' ? 'Tout' : `Nouvelles (${nbNouvelles})`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Favoris */}
+        <div>
+          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Favoris</p>
+          <div className="flex gap-1">
+            {(['tout', 'favoris'] as const).map((val) => (
+              <button
+                key={val}
+                onClick={() => onChange({ ...filtres, toggleFavoris: val })}
+                className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors ${
+                  filtres.toggleFavoris === val
+                    ? 'bg-adh-orange text-white border-adh-orange'
+                    : 'bg-white text-adh-black border-gray-300 hover:border-adh-orange'
+                }`}
+              >
+                {val === 'tout' ? 'Tout' : `★ Favoris (${nbFavoris})`}
               </button>
             ))}
           </div>

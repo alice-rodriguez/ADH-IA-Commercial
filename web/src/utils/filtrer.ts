@@ -9,6 +9,7 @@ export interface FiltresState {
   motsCles: string
   lieu: string
   toggleVues: 'tout' | 'nouvelles'
+  toggleFavoris: 'tout' | 'favoris'
 }
 
 export const FILTRES_INITIAUX: FiltresState = {
@@ -20,6 +21,7 @@ export const FILTRES_INITIAUX: FiltresState = {
   motsCles: '',
   lieu: '',
   toggleVues: 'tout',
+  toggleFavoris: 'tout',
 }
 
 export function filtrer(offres: Offre[], f: FiltresState): Offre[] {
@@ -59,6 +61,8 @@ export function filtrer(offres: Offre[], f: FiltresState): Offre[] {
     }
 
     if (f.toggleVues === 'nouvelles' && o.vue) return false
+
+    if (f.toggleFavoris === 'favoris' && !o.favori) return false
 
     return true
   })
