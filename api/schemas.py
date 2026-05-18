@@ -47,3 +47,22 @@ class NotesUpdate(BaseModel):
     """Body du PATCH /api/offres/{id}/notes. None ou chaîne vide = effacer."""
 
     notes: Optional[str] = None
+
+
+class CandidatMatch(BaseModel):
+    """Un candidat (CV) matché pour une offre."""
+
+    cv_id: int
+    nom_fichier: str
+    nom_candidat: Optional[str]
+    titre_courant: Optional[str]
+    annees_experience: Optional[int]
+    localisation_preferee: Optional[str]
+    score_global: int
+    score_competences: int
+    score_domaine: int
+    score_experience: int
+    score_contrat: int
+    score_lieu: int
+    details_json: Optional[str]
+    date_calcul: Optional[str]

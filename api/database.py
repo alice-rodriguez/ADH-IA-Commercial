@@ -187,3 +187,69 @@ def maj_notes(offre_id: int, notes: Optional[str]) -> None:
             """,
             (offre_id, notes),
         )
+
+
+# ── Matching CVs ↔ Offres ────────────────────────────────────────────────────
+
+
+def get_candidats_par_offre(offre_id: int, limit: int = 20) -> list[dict]:
+    """Retourne les CVs matchés pour une offre, triés par score_global DESC."""
+    with _connexion() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                c.id            AS cv_id,
+                c.nom_fichier,
+                c.nom_candidat,
+                c.titre_courant,
+                c.annees_experience,
+                c.localisation_preferee,
+                m.score_global,
+                m.score_competences,
+                m.score_domaine,
+                m.score_experience,
+                m.score_contrat,
+                m.score_lieu,
+                m.details_json,
+                m.date_calcul
+            FROM matchings m
+            JOIN cvs c ON c.id = m.cv_id
+            WHERE m.offre_id = ?
+            ORDER BY m.score_global DESC
+            LIMIT ?
+            """,
+            (offre_id, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_offres_par_cv(cv_id: int, limit: int = 20) -> list[dict]:
+    """Retourne les offres matchées pour un CV, triées par score_global DESC."""
+    with _connexion() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                o.id            AS offre_id,
+                o.titre,
+                o.entreprise,
+                o.lieu,
+                o.type_contrat_clarifie,
+                o.source,
+                o.url,
+                o.date_collecte,
+                m.score_global,
+                m.score_competences,
+                m.score_domaine,
+                m.score_experience,
+                m.score_contrat,
+                m.score_lieu,
+                m.date_calcul
+            FROM matchings m
+            JOIN offres o ON o.id = m.offre_id
+            WHERE m.cv_id = ?
+            ORDER BY m.score_global DESC
+            LIMIT ?
+            """,
+            (cv_id, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]

@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, '.')
 from src.cvs.extraction import extraire_texte_pdf
 from src.cvs.profilage import profiler_cv
+from src.matching.calculer import recalculer_tous
 from src.storage.database import _connexion
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -153,6 +154,13 @@ def main():
     logger.info("  Orphelins     : %d", stats["orphelins"])
     logger.info("  Profilés      : %d", stats["profiles"])
     logger.info("=" * 60)
+
+    if stats["profiles"] > 0 or stats["ajouts"] > 0 or stats["mises_a_jour"] > 0:
+        logger.info("Recalcul des matchings CVs ↔ offres...")
+        m = recalculer_tous()
+        logger.info("  CVs matchés  : %d", m["nb_cvs"])
+        logger.info("  Matchings    : %d", m["nb_matchings"])
+        logger.info("=" * 60)
 
 
 if __name__ == "__main__":

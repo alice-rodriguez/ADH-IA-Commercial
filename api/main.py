@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.database import (
+    get_candidats_par_offre,
     get_offre_par_id,
     get_offres_recentes,
     maj_favori,
@@ -21,7 +22,7 @@ from api.database import (
     marquer_vue,
     offre_existe,
 )
-from api.schemas import FavoriUpdate, NotesUpdate, Offre, StatutUpdate
+from api.schemas import CandidatMatch, FavoriUpdate, NotesUpdate, Offre, StatutUpdate
 
 VERSION = "0.1.0"
 
@@ -129,6 +130,19 @@ def patch_notes(offre_id: int, body: NotesUpdate):
             raise HTTPException(404, f"Offre {offre_id} non trouvée")
         maj_notes(offre_id, body.notes)
         return _verifier_et_recharger(offre_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur base de données : {e}")
+
+
+@app.get("/api/offres/{offre_id}/candidats", response_model=list[CandidatMatch])
+def candidats_pour_offre(offre_id: int, limit: int = 20):
+    """Retourne les CVs matchés pour une offre, triés par score_global DESC."""
+    try:
+        if not offre_existe(offre_id):
+            raise HTTPException(404, f"Offre {offre_id} non trouvée")
+        return get_candidats_par_offre(offre_id, limit=limit)
     except HTTPException:
         raise
     except Exception as e:

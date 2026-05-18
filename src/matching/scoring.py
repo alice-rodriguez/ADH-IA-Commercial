@@ -1,0 +1,204 @@
+"""Fonctions de scoring pour le matching CVs ↔ offres.
+
+Pondération globale :
+  Compétences  40 %
+  Domaine      25 %
+  Expérience   15 %
+  Contrat      10 %
+  Lieu         10 %
+"""
+
+import json
+import logging
+from typing import Optional
+
+from src.matching.utils import (
+    VARIANTES_DOMAINES,
+    _domaines_cv_normalises,
+    extraire_annees_requises,
+    lieu_proche,
+    normaliser,
+)
+
+logger = logging.getLogger(__name__)
+
+POIDS = {
+    "competences": 0.40,
+    "domaine":     0.25,
+    "experience":  0.15,
+    "contrat":     0.10,
+    "lieu":        0.10,
+}
+
+
+# ---------------------------------------------------------------------------
+# Scores individuels (retournent un entier 0–100)
+# ---------------------------------------------------------------------------
+
+
+def score_competences(competences_cv: list[str], texte_offre: str) -> int:
+    """Proportion de compétences du CV trouvées dans le texte de l'offre."""
+    if not competences_cv or not texte_offre:
+        return 0
+    texte_norm = normaliser(texte_offre)
+    trouvees = sum(1 for c in competences_cv if normaliser(c) in texte_norm)
+    return round(100 * trouvees / len(competences_cv))
+
+
+def score_domaine(domaines_cv: list[str], texte_offre: str) -> int:
+    """Correspondance des domaines métier entre CV et offre.
+
+    Si le CV n'a pas de domaine renseigné → 50 (neutre).
+    """
+    if not domaines_cv:
+        return 50
+    if not texte_offre:
+        return 0
+
+    texte_norm = normaliser(texte_offre)
+    couvertes_cv = _domaines_cv_normalises(domaines_cv)
+
+    if not couvertes_cv:
+        return 50
+
+    correspondances = 0
+    for cle in couvertes_cv:
+        for variante in VARIANTES_DOMAINES[cle]:
+            if variante in texte_norm:
+                correspondances += 1
+                break
+
+    return round(100 * correspondances / len(couvertes_cv))
+
+
+def score_experience(annees_cv: Optional[int], texte_offre: str) -> int:
+    """Adéquation entre l'expérience du CV et celle requise dans l'offre.
+
+    Si l'expérience CV est inconnue → 50 (neutre).
+    Si l'offre ne précise pas → 75 (pas de barrière).
+    """
+    if annees_cv is None:
+        return 50
+    annees_requises = extraire_annees_requises(texte_offre)
+    if annees_requises is None:
+        return 75
+    if annees_cv >= annees_requises:
+        return 100
+    ratio = annees_cv / annees_requises
+    return round(100 * ratio)
+
+
+def score_contrat(types_cv: list[str], type_offre: Optional[str]) -> int:
+    """Correspondance type de contrat.
+
+    CV sans préférence (liste vide) → 100 (ouvert à tout).
+    Offre sans type → 75.
+    """
+    if not types_cv:
+        return 100
+    if not type_offre:
+        return 75
+
+    type_offre_norm = normaliser(type_offre)
+    for t in types_cv:
+        t_norm = normaliser(t)
+        if t_norm in type_offre_norm or type_offre_norm in t_norm:
+            return 100
+        # Correspondances sémantiques fréquentes
+        if t_norm in ("freelance", "independant") and any(
+            k in type_offre_norm for k in ("freelance", "independant", "mission")
+        ):
+            return 100
+        if t_norm == "cdi" and "cdi" in type_offre_norm:
+            return 100
+        if t_norm == "cdd" and "cdd" in type_offre_norm:
+            return 100
+    return 0
+
+
+def score_lieu(lieu_cv: Optional[str], lieu_offre: Optional[str]) -> int:
+    """Délègue à lieu_proche() (0 / 50 / 75 / 100)."""
+    return lieu_proche(lieu_cv or "", lieu_offre or "")
+
+
+# ---------------------------------------------------------------------------
+# Score global
+# ---------------------------------------------------------------------------
+
+
+def calculer_score_global(cv: dict, offre: dict) -> dict:
+    """Calcule tous les scores pour un couple (CV, offre).
+
+    Args:
+        cv: dict avec clés issues de la table cvs (JSON dans competences_techniques,
+            domaines, types_contrat_souhaites).
+        offre: dict avec clés issues de la table offres.
+
+    Returns:
+        Dict avec score_global, score_competences, score_domaine,
+        score_experience, score_contrat, score_lieu, details_json.
+    """
+    def _parse_json_list(val) -> list:
+        if not val:
+            return []
+        if isinstance(val, list):
+            return val
+        try:
+            return json.loads(val) or []
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    competences_cv = _parse_json_list(cv.get("competences_techniques"))
+    domaines_cv = _parse_json_list(cv.get("domaines"))
+    types_cv = _parse_json_list(cv.get("types_contrat_souhaites"))
+    annees_cv: Optional[int] = cv.get("annees_experience")
+    lieu_cv: Optional[str] = cv.get("localisation_preferee")
+
+    texte_offre = " ".join(
+        str(v) for v in [
+            offre.get("titre", ""),
+            offre.get("description", ""),
+            offre.get("resume_ia", ""),
+            offre.get("lieu", ""),
+            offre.get("type_contrat_clarifie", "") or offre.get("type_contrat", ""),
+        ] if v
+    )
+    lieu_offre: Optional[str] = offre.get("lieu")
+    type_offre: Optional[str] = offre.get("type_contrat_clarifie") or offre.get("type_contrat")
+
+    sc = score_competences(competences_cv, texte_offre)
+    sd = score_domaine(domaines_cv, texte_offre)
+    se = score_experience(annees_cv, texte_offre)
+    sct = score_contrat(types_cv, type_offre)
+    sl = score_lieu(lieu_cv, lieu_offre)
+
+    global_ = round(
+        sc  * POIDS["competences"] +
+        sd  * POIDS["domaine"] +
+        se  * POIDS["experience"] +
+        sct * POIDS["contrat"] +
+        sl  * POIDS["lieu"]
+    )
+
+    details = {
+        "score_competences": sc,
+        "score_domaine": sd,
+        "score_experience": se,
+        "score_contrat": sct,
+        "score_lieu": sl,
+        "nb_competences_cv": len(competences_cv),
+        "domaines_cv": domaines_cv,
+        "annees_cv": annees_cv,
+        "types_contrat_cv": types_cv,
+        "lieu_cv": lieu_cv,
+    }
+
+    return {
+        "score_global":      global_,
+        "score_competences": sc,
+        "score_domaine":     sd,
+        "score_experience":  se,
+        "score_contrat":     sct,
+        "score_lieu":        sl,
+        "details_json":      json.dumps(details, ensure_ascii=False),
+    }
