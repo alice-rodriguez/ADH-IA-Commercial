@@ -11,3 +11,7 @@ venv/
 dist/
 build/
 .DS_Store
+
+# CVs des candidats (données personnelles RGPD)
+cvs/*.pdf
+cvs/*.PDF
