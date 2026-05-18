@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { fetchOffres } from './api'
+import type { CompteurCandidat } from './api'
+import { fetchCompteurs, fetchOffres } from './api'
 import Filtres from './components/Filtres'
+import ModaleCandidats from './components/ModaleCandidats'
 import OffreCard from './components/OffreCard'
 import type { Offre } from './types'
 import { filtrer, FILTRES_INITIAUX } from './utils/filtrer'
@@ -11,10 +13,15 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filtres, setFiltres] = useState<FiltresState>(FILTRES_INITIAUX)
+  const [compteurs, setCompteurs] = useState<Record<number, CompteurCandidat>>({})
+  const [modaleOuverte, setModaleOuverte] = useState<{ offreId: number; titreOffre: string } | null>(null)
 
   useEffect(() => {
-    fetchOffres()
-      .then(setOffres)
+    Promise.all([fetchOffres(), fetchCompteurs(40)])
+      .then(([offresData, compteursData]) => {
+        setOffres(offresData)
+        setCompteurs(compteursData)
+      })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
@@ -23,6 +30,14 @@ function App() {
 
   function handleUpdate(offre: Offre) {
     setOffres((prev) => prev.map((o) => (o.id === offre.id ? offre : o)))
+  }
+
+  function handleOuvrirCandidats(offreId: number, titreOffre: string) {
+    setModaleOuverte({ offreId, titreOffre })
+  }
+
+  function handleFermerModale() {
+    setModaleOuverte(null)
   }
 
   return (
@@ -80,11 +95,20 @@ function App() {
                 key={offre.id}
                 offre={offre}
                 onUpdate={handleUpdate}
+                compteur={compteurs[offre.id]}
+                onOuvrirCandidats={handleOuvrirCandidats}
               />
             ))}
           </div>
         )}
       </main>
+      {modaleOuverte && (
+        <ModaleCandidats
+          offreId={modaleOuverte.offreId}
+          titreOffre={modaleOuverte.titreOffre}
+          onClose={handleFermerModale}
+        />
+      )}
     </div>
   )
 }

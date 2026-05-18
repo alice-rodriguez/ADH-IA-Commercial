@@ -223,6 +223,36 @@ def get_candidats_par_offre(offre_id: int, limit: int = 20) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def compter_candidats_par_offre(score_min: int = 40) -> dict[int, int]:
+    """Retourne {offre_id: nb_candidats} pour les candidats avec score_global >= score_min."""
+    with _connexion() as conn:
+        rows = conn.execute(
+            """
+            SELECT offre_id, COUNT(*) as n
+            FROM matchings
+            WHERE score_global >= ?
+            GROUP BY offre_id
+            """,
+            (score_min,),
+        ).fetchall()
+    return {r["offre_id"]: r["n"] for r in rows}
+
+
+def get_top_score_par_offre(score_min: int = 40) -> dict[int, int]:
+    """Retourne {offre_id: meilleur_score} parmi les candidats >= score_min."""
+    with _connexion() as conn:
+        rows = conn.execute(
+            """
+            SELECT offre_id, MAX(score_global) as top
+            FROM matchings
+            WHERE score_global >= ?
+            GROUP BY offre_id
+            """,
+            (score_min,),
+        ).fetchall()
+    return {r["offre_id"]: r["top"] for r in rows}
+
+
 def get_offres_par_cv(cv_id: int, limit: int = 20) -> list[dict]:
     """Retourne les offres matchées pour un CV, triées par score_global DESC."""
     with _connexion() as conn:

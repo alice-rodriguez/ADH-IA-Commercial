@@ -45,3 +45,39 @@ export async function patchNotes(id: number, notes: string | null): Promise<Offr
   if (!r.ok) throw new Error(`Erreur PATCH /notes : ${r.status}`)
   return r.json()
 }
+
+export interface Candidat {
+  cv_id: number
+  nom_fichier: string
+  nom_candidat: string | null
+  titre_courant: string | null
+  annees_experience: number | null
+  localisation_preferee: string | null
+  score_global: number
+  score_competences: number
+  score_domaine: number
+  score_experience: number
+  score_contrat: number
+  score_lieu: number
+  details_json: string | null
+  date_calcul: string | null
+}
+
+export interface CompteurCandidat {
+  nb: number
+  top: number
+}
+
+export async function fetchCompteurs(scoreMin: number = 40): Promise<Record<number, CompteurCandidat>> {
+  const r = await fetch(`${API_BASE_URL}/api/offres/compteurs-candidats?score_min=${scoreMin}`)
+  if (!r.ok) throw new Error(`Erreur compteurs : ${r.status}`)
+  const raw: Record<string, CompteurCandidat> = await r.json()
+  // Les clés arrivent en string depuis JSON, on les recast en number
+  return Object.fromEntries(Object.entries(raw).map(([k, v]) => [Number(k), v]))
+}
+
+export async function fetchCandidats(offreId: number): Promise<Candidat[]> {
+  const r = await fetch(`${API_BASE_URL}/api/offres/${offreId}/candidats`)
+  if (!r.ok) throw new Error(`Erreur candidats : ${r.status}`)
+  return r.json()
+}

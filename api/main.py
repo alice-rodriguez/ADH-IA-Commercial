@@ -13,9 +13,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.database import (
+    compter_candidats_par_offre,
     get_candidats_par_offre,
     get_offre_par_id,
     get_offres_recentes,
+    get_top_score_par_offre,
     maj_favori,
     maj_notes,
     maj_statut,
@@ -59,6 +61,27 @@ def liste_offres():
         return get_offres_recentes(jours=30)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur base de données : {e}")
+
+
+@app.get("/api/offres/compteurs-candidats")
+def compteurs_candidats(score_min: int = 40):
+    """Retourne {offre_id: {nb, top_score}} pour les badges sur les cartes.
+
+    Format : {"1": {"nb": 2, "top": 59}, "5": {"nb": 1, "top": 47}, ...}
+    """
+    try:
+        if score_min < 0 or score_min > 100:
+            raise HTTPException(422, "score_min doit être dans [0, 100]")
+        compteurs = compter_candidats_par_offre(score_min)
+        tops = get_top_score_par_offre(score_min)
+        return {
+            offre_id: {"nb": nb, "top": tops.get(offre_id, 0)}
+            for offre_id, nb in compteurs.items()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur base de données : {e}")
 
 
 @app.get("/api/offres/{offre_id}", response_model=Offre)

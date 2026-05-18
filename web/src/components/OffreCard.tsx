@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { Offre } from '../types'
+import type { CompteurCandidat } from '../api'
 import { patchFavori, patchNotes, patchStatut, patchVue } from '../api'
+import type { Offre } from '../types'
 
 const CONTRAT_COLORS: Array<[RegExp, string]> = [
   [/freelance|indépendant|independant/i, 'bg-adh-orange text-white'],
@@ -62,9 +63,11 @@ const STATUT_SELECT_CLASS: Record<string, string> = {
 interface Props {
   offre: Offre
   onUpdate: (offre: Offre) => void
+  compteur?: CompteurCandidat
+  onOuvrirCandidats?: (offreId: number, titreOffre: string) => void
 }
 
-export default function OffreCard({ offre, onUpdate }: Props) {
+export default function OffreCard({ offre, onUpdate, compteur, onOuvrirCandidats }: Props) {
   const [editingNotes, setEditingNotes] = useState(false)
   const [notesText, setNotesText] = useState(offre.notes ?? '')
 
@@ -247,6 +250,17 @@ export default function OffreCard({ offre, onUpdate }: Props) {
           </button>
         )}
       </div>
+
+      {/* Badge candidats compatibles */}
+      {compteur && compteur.nb >= 1 && onOuvrirCandidats && (
+        <button
+          onClick={() => onOuvrirCandidats(offre.id, offre.titre)}
+          className="text-sm font-medium text-adh-orange bg-orange-50 hover:bg-orange-100 px-3 py-2 rounded-md text-left transition-colors"
+        >
+          🎯 {compteur.nb} candidat{compteur.nb > 1 ? 's' : ''} compatible{compteur.nb > 1 ? 's' : ''}{' '}
+          <span className="text-gray-500">· Top : {compteur.top}%</span>
+        </button>
+      )}
 
       {/* Bouton voir */}
       {offre.url ? (
