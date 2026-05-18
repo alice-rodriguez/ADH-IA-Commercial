@@ -1,4 +1,4 @@
-"""Initialise la table cvs en BDD (CV.1).
+"""Initialise la table cvs en BDD (CV.1 + CV.2).
 
 Idempotent : ne touche pas la table si elle existe déjà
 avec les bonnes colonnes.
@@ -19,11 +19,33 @@ CREATE TABLE IF NOT EXISTS cvs (
 );
 """
 
+COLONNES_AJOUTEES = [
+    ('nom_candidat',             'TEXT'),
+    ('titre_courant',            'TEXT'),
+    ('competences_techniques',   'TEXT'),
+    ('domaines',                 'TEXT'),
+    ('annees_experience',        'INTEGER'),
+    ('types_contrat_souhaites',  'TEXT'),
+    ('localisation_preferee',    'TEXT'),
+    ('tjm_moyen',                'INTEGER'),
+    ('salaire_souhaite',         'INTEGER'),
+    ('date_dernier_profilage',   'TIMESTAMP'),
+]
+
+
+def _colonne_existe(conn, table: str, colonne: str) -> bool:
+    cursor = conn.execute(f"PRAGMA table_info({table})")
+    return any(row['name'] == colonne for row in cursor)
+
 
 def main():
     with _connexion() as conn:
         conn.executescript(SCHEMA)
-    print("[OK] Table cvs créée (ou déjà existante)")
+        for col, type_ in COLONNES_AJOUTEES:
+            if not _colonne_existe(conn, 'cvs', col):
+                conn.execute(f"ALTER TABLE cvs ADD COLUMN {col} {type_}")
+                print(f"[+] Colonne {col} ajoutée")
+    print("[OK] Table cvs à jour")
 
 
 if __name__ == "__main__":
