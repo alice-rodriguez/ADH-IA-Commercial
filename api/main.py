@@ -14,17 +14,29 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.database import (
     compter_candidats_par_offre,
+    cv_existe,
+    get_all_cvs,
     get_candidats_par_offre,
+    get_cv_par_id,
     get_offre_par_id,
     get_offres_recentes,
     get_top_score_par_offre,
     maj_favori,
     maj_notes,
+    maj_notes_adh,
     maj_statut,
     marquer_vue,
     offre_existe,
 )
-from api.schemas import CandidatMatch, FavoriUpdate, NotesUpdate, Offre, StatutUpdate
+from api.schemas import (
+    CV,
+    CandidatMatch,
+    FavoriUpdate,
+    NotesAdhUpdate,
+    NotesUpdate,
+    Offre,
+    StatutUpdate,
+)
 
 VERSION = "0.1.0"
 
@@ -168,5 +180,53 @@ def candidats_pour_offre(offre_id: int, limit: int = 20):
         return get_candidats_par_offre(offre_id, limit=limit)
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur base de données : {e}")
+
+
+# ── CVs ───────────────────────────────────────────────────────────────────────
+
+
+@app.get("/api/cvs", response_model=list[CV])
+def liste_cvs():
+    """Retourne tous les CVs (profilage + Notes ADH)."""
+    try:
+        return get_all_cvs()
+    except Exception as e:
+        raise HTTPException(500, f"Erreur base de données : {e}")
+
+
+@app.get("/api/cvs/{cv_id}", response_model=CV)
+def detail_cv(cv_id: int):
+    """Retourne un CV par son id."""
+    try:
+        cv = get_cv_par_id(cv_id)
+        if cv is None:
+            raise HTTPException(404, f"CV {cv_id} non trouvé")
+        return cv
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur base de données : {e}")
+
+
+@app.patch("/api/cvs/{cv_id}/notes-adh", response_model=CV)
+def patch_notes_adh(cv_id: int, body: NotesAdhUpdate):
+    """Met à jour les Notes ADH d'un CV."""
+    try:
+        if not cv_existe(cv_id):
+            raise HTTPException(404, f"CV {cv_id} non trouvé")
+        notes = body.model_dump(exclude_unset=True)
+        if not notes:
+            raise HTTPException(422, "Aucun champ à mettre à jour")
+        maj_notes_adh(cv_id, notes)
+        cv = get_cv_par_id(cv_id)
+        if cv is None:
+            raise HTTPException(500, "CV introuvable après mise à jour")
+        return cv
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(422, str(e))
     except Exception as e:
         raise HTTPException(500, f"Erreur base de données : {e}")

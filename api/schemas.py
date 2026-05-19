@@ -6,6 +6,54 @@ from typing import Literal, Optional
 from pydantic import BaseModel
 
 
+class CV(BaseModel):
+    """Représentation complète d'un CV (profilage Haiku + Notes ADH)."""
+
+    id: int
+    nom_fichier: str
+    chemin_relatif: str
+
+    # Métadonnées scan
+    date_ajout: Optional[str] = None
+    date_dernier_scan: Optional[str] = None
+
+    # Profilage Haiku
+    nom_candidat: Optional[str] = None
+    titre_courant: Optional[str] = None
+    competences_techniques: Optional[str] = None
+    domaines: Optional[str] = None
+    annees_experience: Optional[int] = None
+    types_contrat_souhaites: Optional[str] = None
+    localisation_preferee: Optional[str] = None
+    tjm_moyen: Optional[int] = None
+    salaire_souhaite: Optional[int] = None
+    date_dernier_profilage: Optional[str] = None
+
+    # Notes ADH
+    tjm_negocie: Optional[int] = None
+    salaire_negocie: Optional[int] = None
+    postes_cibles: Optional[str] = None
+    mobilite: Optional[str] = None
+    disponibilite: Optional[str] = None
+    commentaires_adh: Optional[str] = None
+    statut_relation: Optional[str] = None
+    date_dernier_contact: Optional[str] = None
+    date_modif_notes_adh: Optional[str] = None
+
+
+class NotesAdhUpdate(BaseModel):
+    """Body du PATCH /api/cvs/{id}/notes-adh."""
+
+    tjm_negocie: Optional[int] = None
+    salaire_negocie: Optional[int] = None
+    postes_cibles: Optional[str] = None
+    mobilite: Optional[str] = None
+    disponibilite: Optional[str] = None
+    commentaires_adh: Optional[str] = None
+    statut_relation: Optional[Literal['actif', 'en_pause', 'place', 'inactif']] = None
+    date_dernier_contact: Optional[str] = None
+
+
 class Offre(BaseModel):
     """Format de retour d'une offre dans les réponses de l'API."""
 

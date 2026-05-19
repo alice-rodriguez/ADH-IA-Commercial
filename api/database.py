@@ -223,6 +223,48 @@ def get_candidats_par_offre(offre_id: int, limit: int = 20) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_all_cvs() -> list[dict]:
+    """Retourne tous les CVs triés par nom_candidat puis nom_fichier."""
+    with _connexion() as conn:
+        rows = conn.execute(
+            "SELECT * FROM cvs ORDER BY nom_candidat ASC, nom_fichier ASC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_cv_par_id(cv_id: int) -> Optional[dict]:
+    """Retourne un CV par son id ou None."""
+    with _connexion() as conn:
+        row = conn.execute("SELECT * FROM cvs WHERE id = ?", (cv_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def cv_existe(cv_id: int) -> bool:
+    """Vérifie qu'un CV existe avant tout UPDATE."""
+    with _connexion() as conn:
+        row = conn.execute("SELECT 1 FROM cvs WHERE id = ?", (cv_id,)).fetchone()
+    return row is not None
+
+
+def maj_notes_adh(cv_id: int, notes: dict) -> None:
+    """UPDATE partiel des Notes ADH. Seuls les champs fournis sont mis à jour."""
+    champs_autorises = {
+        'tjm_negocie', 'salaire_negocie', 'postes_cibles', 'mobilite',
+        'disponibilite', 'commentaires_adh', 'statut_relation',
+        'date_dernier_contact',
+    }
+    updates = {k: v for k, v in notes.items() if k in champs_autorises}
+    if not updates:
+        raise ValueError("Aucun champ Notes ADH à mettre à jour.")
+
+    cols = ", ".join(f"{k} = ?" for k in updates) + \
+           ", date_modif_notes_adh = datetime('now')"
+    values = list(updates.values()) + [cv_id]
+
+    with _connexion() as conn:
+        conn.execute(f"UPDATE cvs SET {cols} WHERE id = ?", values)
+
+
 def compter_candidats_par_offre(score_min: int = 40) -> dict[int, int]:
     """Retourne {offre_id: nb_candidats} pour les candidats avec score_global >= score_min."""
     with _connexion() as conn:

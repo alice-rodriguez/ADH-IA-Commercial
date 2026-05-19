@@ -30,6 +30,16 @@ COLONNES_AJOUTEES = [
     ('tjm_moyen',                'INTEGER'),
     ('salaire_souhaite',         'INTEGER'),
     ('date_dernier_profilage',   'TIMESTAMP'),
+    # Notes ADH (CV.2.bis.1)
+    ('tjm_negocie',              'INTEGER'),
+    ('salaire_negocie',          'INTEGER'),
+    ('postes_cibles',            'TEXT'),
+    ('mobilite',                 'TEXT'),
+    ('disponibilite',            'TEXT'),
+    ('commentaires_adh',         'TEXT'),
+    ('statut_relation',          "TEXT DEFAULT 'actif'"),
+    ('date_dernier_contact',     'DATE'),
+    ('date_modif_notes_adh',     'TIMESTAMP'),
 ]
 
 
