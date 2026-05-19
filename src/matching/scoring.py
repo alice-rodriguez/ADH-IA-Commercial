@@ -1,11 +1,11 @@
 """Fonctions de scoring pour le matching CVs ↔ offres.
 
-Pondération globale :
-  Compétences  40 %
-  Domaine      25 %
-  Expérience   15 %
-  Contrat      10 %
-  Lieu         10 %
+Pondération globale (CV.2.bis.3) :
+  Compétences  50 %
+  Domaine      30 %
+  Expérience   20 %
+  Lieu          0 % (calculé + stocké dans details_json, hors score global)
+  Contrat       0 % (idem)
 """
 
 import json
@@ -23,11 +23,11 @@ from src.matching.utils import (
 logger = logging.getLogger(__name__)
 
 POIDS = {
-    "competences": 0.40,
-    "domaine":     0.25,
-    "experience":  0.15,
-    "contrat":     0.10,
-    "lieu":        0.10,
+    "competences": 0.50,
+    "domaine":     0.30,
+    "experience":  0.20,
+    "contrat":     0.00,   # gardé pour traçabilité, hors score global
+    "lieu":        0.00,   # idem
 }
 
 
@@ -167,6 +167,23 @@ def calculer_score_global(cv: dict, offre: dict) -> dict:
     type_offre: Optional[str] = offre.get("type_contrat_clarifie") or offre.get("type_contrat")
 
     sc = score_competences(competences_cv, texte_offre)
+
+    # Boost postes_cibles (Notes ADH) : +25 si au moins une expression trouvée
+    postes_cibles_raw = (cv.get("postes_cibles") or "").strip()
+    postes_cibles_trouves: list[str] = []
+    if postes_cibles_raw:
+        texte_offre_norm = normaliser(texte_offre)
+        expressions = [
+            e.strip()
+            for e in postes_cibles_raw.replace("\n", ",").split(",")
+            if e.strip()
+        ]
+        for expr in expressions:
+            if normaliser(expr) in texte_offre_norm:
+                postes_cibles_trouves.append(expr)
+        if postes_cibles_trouves:
+            sc = min(100, sc + 25)
+
     sd = score_domaine(domaines_cv, texte_offre)
     se = score_experience(annees_cv, texte_offre)
     sct = score_contrat(types_cv, type_offre)
@@ -191,6 +208,7 @@ def calculer_score_global(cv: dict, offre: dict) -> dict:
         "annees_cv": annees_cv,
         "types_contrat_cv": types_cv,
         "lieu_cv": lieu_cv,
+        "postes_cibles_trouves": postes_cibles_trouves,
     }
 
     return {

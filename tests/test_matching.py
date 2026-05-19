@@ -99,6 +99,83 @@ def main():
     check_range("score_global dans [0,100]", result["score_global"], 0, 100)
     check("details_json présent",            "details_json" in result,       True)
 
+    # ── postes_cibles boost ──────────────────────────────────────────────────
+    # CV avec compétences partielles (1/3 matchée) + postes_cibles qui matche
+    cv_avec_postes = {
+        "competences_techniques": '["Python", "Java", "C++"]',
+        "domaines": '[]',
+        "annees_experience": None,
+        "types_contrat_souhaites": '[]',
+        "localisation_preferee": None,
+        "postes_cibles": "Directeur de programme SAP",
+    }
+    cv_sans_postes = {
+        "competences_techniques": '["Python", "Java", "C++"]',
+        "domaines": '[]',
+        "annees_experience": None,
+        "types_contrat_souhaites": '[]',
+        "localisation_preferee": None,
+    }
+    offre_postes = {
+        "titre": "Directeur de programme SAP banque",
+        "description": "Mission Python requis",
+        "resume_ia": "",
+        "lieu": "Paris",
+        "type_contrat": "Freelance",
+        "type_contrat_clarifie": "Freelance",
+    }
+    r_avec = calculer_score_global(cv_avec_postes, offre_postes)
+    r_sans = calculer_score_global(cv_sans_postes, offre_postes)
+    check("boost postes_cibles : score_competences boosté de +25",
+          r_avec["score_competences"] - r_sans["score_competences"], 25)
+
+    # ── lieu + contrat à 0% : bon score même si mismatch ────────────────────
+    cv_geo_contrat_ko = {
+        "competences_techniques": '["Python", "SQL", "Data"]',
+        "domaines": '["banque"]',
+        "annees_experience": 5,
+        "types_contrat_souhaites": '["CDI"]',
+        "localisation_preferee": "Bordeaux",
+    }
+    offre_geo_contrat_ko = {
+        "titre": "Data Analyst Python SQL banque",
+        "description": "secteur bancaire 3 ans d'expérience Paris",
+        "resume_ia": "",
+        "lieu": "Paris",
+        "type_contrat": "Freelance",
+        "type_contrat_clarifie": "Freelance",
+    }
+    r_geo = calculer_score_global(cv_geo_contrat_ko, offre_geo_contrat_ko)
+    check("lieu+contrat 0poids : score_lieu hors-match calculé", r_geo["score_lieu"], 0)
+    check("lieu+contrat 0poids : score_contrat hors-match calculé", r_geo["score_contrat"], 0)
+    check_range("lieu+contrat 0poids : score_global élevé malgré mismatch",
+                r_geo["score_global"], 80, 100)
+
+    # ── details_json contient postes_cibles_trouves ──────────────────────────
+    import json as _json
+    cv_pc = {
+        "competences_techniques": '["Python"]',
+        "domaines": '[]',
+        "annees_experience": None,
+        "types_contrat_souhaites": '[]',
+        "localisation_preferee": None,
+        "postes_cibles": "Directeur de programme SAP, Chef de projet",
+    }
+    offre_pc = {
+        "titre": "Chef de projet IT",
+        "description": "Mission chef de projet Paris",
+        "resume_ia": "",
+        "lieu": "Paris",
+        "type_contrat": "Freelance",
+        "type_contrat_clarifie": "Freelance",
+    }
+    r_pc = calculer_score_global(cv_pc, offre_pc)
+    details_pc = _json.loads(r_pc["details_json"])
+    check("details_json : postes_cibles_trouves présent",
+          "postes_cibles_trouves" in details_pc, True)
+    check("details_json : Chef de projet trouvé",
+          "Chef de projet" in details_pc.get("postes_cibles_trouves", []), True)
+
     # ── Résumé ───────────────────────────────────────────────────────────────
     total = _ok + _fails
     if _fails == 0:

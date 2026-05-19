@@ -9,8 +9,12 @@ Lancement local :
     uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
 """
 
+import logging
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+logger = logging.getLogger(__name__)
 
 from api.database import (
     compter_candidats_par_offre,
@@ -220,6 +224,12 @@ def patch_notes_adh(cv_id: int, body: NotesAdhUpdate):
         if not notes:
             raise HTTPException(422, "Aucun champ à mettre à jour")
         maj_notes_adh(cv_id, notes)
+        # Recalcul des matchings (postes_cibles peut avoir changé)
+        try:
+            from src.matching.calculer import recalculer_pour_cv
+            recalculer_pour_cv(cv_id)
+        except Exception as e:
+            logger.warning("Recalcul matchings échoué pour CV %d : %s", cv_id, e)
         cv = get_cv_par_id(cv_id)
         if cv is None:
             raise HTTPException(500, "CV introuvable après mise à jour")
