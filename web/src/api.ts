@@ -81,3 +81,65 @@ export async function fetchCandidats(offreId: number): Promise<Candidat[]> {
   if (!r.ok) throw new Error(`Erreur candidats : ${r.status}`)
   return r.json()
 }
+
+export interface CV {
+  id: number
+  nom_fichier: string
+  chemin_relatif: string
+  date_ajout: string | null
+  date_dernier_scan: string | null
+  // Profilage Haiku
+  nom_candidat: string | null
+  titre_courant: string | null
+  competences_techniques: string | null
+  domaines: string | null
+  annees_experience: number | null
+  types_contrat_souhaites: string | null
+  localisation_preferee: string | null
+  tjm_moyen: number | null
+  salaire_souhaite: number | null
+  date_dernier_profilage: string | null
+  // Notes ADH
+  tjm_negocie: number | null
+  salaire_negocie: number | null
+  postes_cibles: string | null
+  mobilite: string | null
+  disponibilite: string | null
+  commentaires_adh: string | null
+  statut_relation: string | null
+  date_dernier_contact: string | null
+  date_modif_notes_adh: string | null
+}
+
+export interface NotesAdhUpdate {
+  tjm_negocie?: number | null
+  salaire_negocie?: number | null
+  postes_cibles?: string | null
+  mobilite?: string | null
+  disponibilite?: string | null
+  commentaires_adh?: string | null
+  statut_relation?: 'actif' | 'en_pause' | 'place' | 'inactif'
+  date_dernier_contact?: string | null
+}
+
+export async function fetchCVs(): Promise<CV[]> {
+  const r = await fetch(`${API_BASE_URL}/api/cvs`)
+  if (!r.ok) throw new Error(`Erreur GET /api/cvs : ${r.status}`)
+  return r.json()
+}
+
+export async function fetchCVParId(cvId: number): Promise<CV> {
+  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}`)
+  if (!r.ok) throw new Error(`Erreur GET /api/cvs/${cvId} : ${r.status}`)
+  return r.json()
+}
+
+export async function patchNotesAdh(cvId: number, notes: NotesAdhUpdate): Promise<CV> {
+  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}/notes-adh`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(notes),
+  })
+  if (!r.ok) throw new Error(`Erreur PATCH /notes-adh : ${r.status}`)
+  return r.json()
+}

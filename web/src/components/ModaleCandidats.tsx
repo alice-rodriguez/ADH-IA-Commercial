@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Candidat } from '../api'
-import { fetchCandidats } from '../api'
+import type { Candidat, CV } from '../api'
+import { fetchCVParId, fetchCandidats } from '../api'
+import EditeurNotesAdh from './EditeurNotesAdh'
 
 const SEUILS = [30, 40, 50, 60]
 
@@ -53,7 +54,18 @@ export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props)
   const [loading, setLoading] = useState(true)
   const [seuilAffichage, setSeuilAffichage] = useState(40)
   const [candidatExpanded, setCandidatExpanded] = useState<number | null>(null)
+  const [cvProfilOuvert, setCvProfilOuvert] = useState<CV | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
+
+  async function fetchCVComplet(cvId: number) {
+    try {
+      const cv = await fetchCVParId(cvId)
+      setCvProfilOuvert(cv)
+    } catch (e) {
+      console.error(e)
+      alert('Impossible de charger le profil ADH')
+    }
+  }
 
   useEffect(() => {
     fetchCandidats(offreId)
@@ -73,6 +85,7 @@ export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props)
   const candidatsFiltres = candidats.filter((c) => c.score_global >= seuilAffichage)
 
   return (
+    <>
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
@@ -155,12 +168,20 @@ export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props)
                         {c.localisation_preferee && <span>{c.localisation_preferee}</span>}
                       </div>
                     </div>
-                    <button
-                      onClick={() => toggleExpand(c.cv_id)}
-                      className="text-xs text-gray-500 hover:text-adh-orange shrink-0 border border-gray-200 rounded px-2 py-1 hover:border-adh-orange transition-colors"
-                    >
-                      {expanded ? 'Masquer ▲' : 'Détail du score ▼'}
-                    </button>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => toggleExpand(c.cv_id)}
+                        className="text-xs text-gray-500 hover:text-adh-orange border border-gray-200 rounded px-2 py-1 hover:border-adh-orange transition-colors"
+                      >
+                        {expanded ? 'Masquer ▲' : 'Détail du score ▼'}
+                      </button>
+                      <button
+                        onClick={() => fetchCVComplet(c.cv_id)}
+                        className="text-xs text-gray-500 hover:text-adh-orange border border-gray-200 rounded px-2 py-1 hover:border-adh-orange transition-colors"
+                      >
+                        👤 Profil ADH
+                      </button>
+                    </div>
                   </div>
 
                   {expanded && (
@@ -179,5 +200,15 @@ export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props)
         )}
       </div>
     </div>
+
+    {cvProfilOuvert && (
+      <EditeurNotesAdh
+        cv={cvProfilOuvert}
+        mode="modale"
+        onSauvegarde={() => setCvProfilOuvert(null)}
+        onAnnuler={() => setCvProfilOuvert(null)}
+      />
+    )}
+    </>
   )
 }
