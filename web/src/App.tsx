@@ -26,7 +26,17 @@ function App() {
       .finally(() => setLoading(false))
   }, [])
 
-  const offresFiltrees = useMemo(() => filtrer(offres, filtres), [offres, filtres])
+  const idsAvecMatching = useMemo(
+    () => new Set(Object.keys(compteurs).map(Number)),
+    [compteurs],
+  )
+
+  const nbAvecMatching = idsAvecMatching.size
+
+  const offresFiltrees = useMemo(
+    () => filtrer(offres, filtres, idsAvecMatching),
+    [offres, filtres, idsAvecMatching],
+  )
 
   function handleUpdate(offre: Offre) {
     setOffres((prev) => prev.map((o) => (o.id === offre.id ? offre : o)))
@@ -53,6 +63,7 @@ function App() {
           filtres={filtres}
           onChange={setFiltres}
           nbAffichees={offresFiltrees.length}
+          nbAvecMatching={nbAvecMatching}
         />
       )}
 

@@ -51,9 +51,10 @@ interface Props {
   filtres: FiltresState
   onChange: (filtres: FiltresState) => void
   nbAffichees: number
+  nbAvecMatching: number
 }
 
-export default function Filtres({ offres, filtres, onChange, nbAffichees }: Props) {
+export default function Filtres({ offres, filtres, onChange, nbAffichees, nbAvecMatching }: Props) {
   const sources = useMemo(() => {
     const set = new Set<string>()
     offres.forEach((o) => { if (o.source) set.add(o.source) })
@@ -274,6 +275,26 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees }: Prop
                 }`}
               >
                 {val === 'tout' ? 'Tout' : `★ Favoris (${nbFavoris})`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Matching */}
+        <div>
+          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Matching</p>
+          <div className="flex gap-1">
+            {(['tout', 'matching'] as const).map((val) => (
+              <button
+                key={val}
+                onClick={() => onChange({ ...filtres, toggleMatching: val })}
+                className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors ${
+                  filtres.toggleMatching === val
+                    ? 'bg-adh-orange text-white border-adh-orange'
+                    : 'bg-white text-adh-black border-gray-300 hover:border-adh-orange'
+                }`}
+              >
+                {val === 'tout' ? 'Tout' : `🎯 Matching (${nbAvecMatching})`}
               </button>
             ))}
           </div>

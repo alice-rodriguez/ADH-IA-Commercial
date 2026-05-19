@@ -10,6 +10,7 @@ export interface FiltresState {
   lieu: string
   toggleVues: 'tout' | 'nouvelles'
   toggleFavoris: 'tout' | 'favoris'
+  toggleMatching: 'tout' | 'matching'
 }
 
 export const FILTRES_INITIAUX: FiltresState = {
@@ -22,9 +23,14 @@ export const FILTRES_INITIAUX: FiltresState = {
   lieu: '',
   toggleVues: 'tout',
   toggleFavoris: 'tout',
+  toggleMatching: 'tout',
 }
 
-export function filtrer(offres: Offre[], f: FiltresState): Offre[] {
+export function filtrer(
+  offres: Offre[],
+  f: FiltresState,
+  idsAvecMatching?: Set<number>,
+): Offre[] {
   return offres.filter((o) => {
     if (f.sources.length > 0 && o.source && !f.sources.includes(o.source)) {
       return false
@@ -63,6 +69,10 @@ export function filtrer(offres: Offre[], f: FiltresState): Offre[] {
     if (f.toggleVues === 'nouvelles' && o.vue) return false
 
     if (f.toggleFavoris === 'favoris' && !o.favori) return false
+
+    if (f.toggleMatching === 'matching') {
+      if (!idsAvecMatching || !idsAvecMatching.has(o.id)) return false
+    }
 
     return true
   })
