@@ -176,6 +176,42 @@ def main():
     check("details_json : Chef de projet trouvé",
           "Chef de projet" in details_pc.get("postes_cibles_trouves", []), True)
 
+    # ── plancher strict : 0 compétence → global = 0 ──────────────────────────
+    offre_pas_de_match = {
+        "titre": "Chef de marketing digital",
+        "description": "Mission banque, 5 ans d'expérience",
+        "resume_ia": "",
+        "lieu": "Paris",
+        "type_contrat": "CDI",
+        "type_contrat_clarifie": "CDI",
+    }
+    cv_nul_competences = {
+        "competences_techniques": '["Java", "Spring", "Hibernate"]',
+        "domaines": '["banque"]',
+        "annees_experience": 15,
+        "types_contrat_souhaites": '[]',
+        "localisation_preferee": None,
+    }
+    r_plancher = calculer_score_global(cv_nul_competences, offre_pas_de_match)
+    check("plancher strict : score_competences=0 → global=0",
+          r_plancher["score_global"], 0)
+    check("plancher strict : flag plancher_active",
+          _json.loads(r_plancher["details_json"]).get("plancher_active"), True)
+
+    # ── plancher inactif si postes_cibles compense ───────────────────────────
+    cv_postes_seuls = {
+        "competences_techniques": '["Java", "Spring"]',
+        "domaines": '["banque"]',
+        "annees_experience": 10,
+        "types_contrat_souhaites": '[]',
+        "localisation_preferee": None,
+        "postes_cibles": "Chef de marketing digital",  # sous-chaîne du titre de l'offre
+    }
+    r_plancher_inactif = calculer_score_global(cv_postes_seuls, offre_pas_de_match)
+    # postes_cibles "Chef de marketing digital" matche le titre → sc = 25, pas de plancher
+    check("plancher inactif si postes_cibles boost",
+          r_plancher_inactif["score_global"] > 0, True)
+
     # ── Résumé ───────────────────────────────────────────────────────────────
     total = _ok + _fails
     if _fails == 0:

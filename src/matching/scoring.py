@@ -1,9 +1,9 @@
 """Fonctions de scoring pour le matching CVs ↔ offres.
 
-Pondération globale (CV.2.bis.3) :
-  Compétences  50 %
-  Domaine      30 %
-  Expérience   20 %
+Pondération globale (CV.2.bis.3.bis) :
+  Compétences  60 %
+  Domaine      25 %
+  Expérience   15 %
   Lieu          0 % (calculé + stocké dans details_json, hors score global)
   Contrat       0 % (idem)
 """
@@ -23,9 +23,9 @@ from src.matching.utils import (
 logger = logging.getLogger(__name__)
 
 POIDS = {
-    "competences": 0.50,
-    "domaine":     0.30,
-    "experience":  0.20,
+    "competences": 0.60,
+    "domaine":     0.25,
+    "experience":  0.15,
     "contrat":     0.00,   # gardé pour traçabilité, hors score global
     "lieu":        0.00,   # idem
 }
@@ -197,6 +197,10 @@ def calculer_score_global(cv: dict, offre: dict) -> dict:
         sl  * POIDS["lieu"]
     )
 
+    # Plancher strict : 0 compétence matchée (après boost) = aucun match
+    if sc == 0:
+        global_ = 0
+
     details = {
         "score_competences": sc,
         "score_domaine": sd,
@@ -209,6 +213,7 @@ def calculer_score_global(cv: dict, offre: dict) -> dict:
         "types_contrat_cv": types_cv,
         "lieu_cv": lieu_cv,
         "postes_cibles_trouves": postes_cibles_trouves,
+        "plancher_active": sc == 0,
     }
 
     return {
