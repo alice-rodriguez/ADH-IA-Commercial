@@ -5,6 +5,7 @@ Réutilise DB_PATH et _connexion() depuis src/storage/database.py
 pour ne pas dupliquer la configuration.
 """
 
+import json
 import sys
 from pathlib import Path
 from typing import Optional
@@ -293,6 +294,51 @@ def get_top_score_par_offre(score_min: int = 40) -> dict[int, int]:
             (score_min,),
         ).fetchall()
     return {r["offre_id"]: r["top"] for r in rows}
+
+
+# ── Analyses IA ─────────────────────────────────────────────────────────────
+
+
+def get_analyse_ia(cv_id: int, offre_id: int) -> dict | None:
+    """Retourne l'analyse IA stockée ou None si absente."""
+    with _connexion() as conn:
+        row = conn.execute(
+            "SELECT * FROM analyses_ia WHERE cv_id = ? AND offre_id = ?",
+            (cv_id, offre_id),
+        ).fetchone()
+    if row is None:
+        return None
+    d = dict(row)
+    for key in ("points_forts", "points_faibles", "questions_a_poser"):
+        raw = d.get(key)
+        try:
+            d[key] = json.loads(raw) if raw else []
+        except (json.JSONDecodeError, TypeError):
+            d[key] = []
+    return d
+
+
+def upsert_analyse_ia(cv_id: int, offre_id: int, analyse: dict) -> None:
+    """UPSERT de l'analyse IA (INSERT OR REPLACE)."""
+    with _connexion() as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO analyses_ia
+                (cv_id, offre_id, score_ia, verdict, explication,
+                 points_forts, points_faibles, questions_a_poser, date_analyse)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            """,
+            (
+                cv_id,
+                offre_id,
+                analyse.get("score_ia"),
+                analyse.get("verdict"),
+                analyse.get("explication"),
+                json.dumps(analyse.get("points_forts", []), ensure_ascii=False),
+                json.dumps(analyse.get("points_faibles", []), ensure_ascii=False),
+                json.dumps(analyse.get("questions_a_poser", []), ensure_ascii=False),
+            ),
+        )
 
 
 def get_offres_par_cv(cv_id: int, limit: int = 20) -> list[dict]:

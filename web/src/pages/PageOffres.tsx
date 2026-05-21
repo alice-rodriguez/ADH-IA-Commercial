@@ -17,7 +17,7 @@ export default function PageOffres() {
   const [modaleOuverte, setModaleOuverte] = useState<{ offreId: number; titreOffre: string } | null>(null)
 
   useEffect(() => {
-    Promise.all([fetchOffres(), fetchCompteurs(40)])
+    Promise.all([fetchOffres(), fetchCompteurs(30)])
       .then(([offresData, compteursData]) => {
         setOffres(offresData)
         setCompteurs(compteursData)

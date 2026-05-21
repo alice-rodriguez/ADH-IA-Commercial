@@ -97,6 +97,18 @@ class NotesUpdate(BaseModel):
     notes: Optional[str] = None
 
 
+class AnalyseIA(BaseModel):
+    """Résultat d'une analyse IA pour un couple (CV, offre)."""
+
+    score_ia: int
+    verdict: str
+    explication: str
+    points_forts: list[str]
+    points_faibles: list[str]
+    questions_a_poser: list[str]
+    date_analyse: Optional[str] = None
+
+
 class CandidatMatch(BaseModel):
     """Un candidat (CV) matché pour une offre."""
 

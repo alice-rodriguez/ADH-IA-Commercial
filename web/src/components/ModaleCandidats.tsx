@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Candidat, CV } from '../api'
-import { fetchCVParId, fetchCandidats } from '../api'
+import type { AnalyseIA, Candidat, CV } from '../api'
+import { fetchAnalyseIA, fetchCVParId, fetchCandidats, lancerAnalyseIA } from '../api'
 import EditeurNotesAdh from './EditeurNotesAdh'
 
 const SEUILS = [30, 40, 50, 60]
@@ -17,6 +17,15 @@ function scoreTextClass(score: number): string {
   if (score >= 60) return 'text-green-500'
   if (score >= 40) return 'text-adh-orange'
   return 'text-gray-400'
+}
+
+function verdictClass(verdict: string): string {
+  switch (verdict) {
+    case 'Excellent candidat': return 'bg-green-700 text-white'
+    case 'Bon candidat':       return 'bg-green-500 text-white'
+    case 'Candidat partiel':   return 'bg-adh-orange text-white'
+    default:                   return 'bg-gray-400 text-white'
+  }
 }
 
 interface BarreScoreProps {
@@ -49,12 +58,16 @@ interface Props {
   onClose: () => void
 }
 
+type AnalyseState = AnalyseIA | 'loading' | null
+
 export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props) {
   const [candidats, setCandidats] = useState<Candidat[]>([])
   const [loading, setLoading] = useState(true)
-  const [seuilAffichage, setSeuilAffichage] = useState(40)
+  const [seuilAffichage, setSeuilAffichage] = useState(30)
   const [candidatExpanded, setCandidatExpanded] = useState<number | null>(null)
   const [cvProfilOuvert, setCvProfilOuvert] = useState<CV | null>(null)
+  const [analysesIA, setAnalysesIA] = useState<Record<number, AnalyseState>>({})
+  const [analyseExpanded, setAnalyseExpanded] = useState<number | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
 
   async function fetchCVComplet(cvId: number) {
@@ -80,6 +93,38 @@ export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props)
 
   function toggleExpand(cvId: number) {
     setCandidatExpanded((prev) => (prev === cvId ? null : cvId))
+  }
+
+  function toggleAnalyse(cvId: number) {
+    setAnalyseExpanded((prev) => (prev === cvId ? null : cvId))
+  }
+
+  async function chargerAnalyse(cvId: number, forcer = false) {
+    setAnalysesIA((prev) => ({ ...prev, [cvId]: 'loading' }))
+    try {
+      let analyse: AnalyseIA | null = null
+      if (!forcer) {
+        analyse = await fetchAnalyseIA(cvId, offreId)
+      }
+      if (!analyse) {
+        analyse = await lancerAnalyseIA(cvId, offreId)
+      }
+      setAnalysesIA((prev) => ({ ...prev, [cvId]: analyse }))
+      setAnalyseExpanded(cvId)
+    } catch (e) {
+      console.error(e)
+      setAnalysesIA((prev) => ({ ...prev, [cvId]: null }))
+      alert("L'analyse IA a échoué. Vérifiez que la clé ANTHROPIC_API_KEY est configurée.")
+    }
+  }
+
+  function handleAnalyseBtnClick(cvId: number) {
+    const state = analysesIA[cvId]
+    if (state === undefined || state === null) {
+      chargerAnalyse(cvId)
+    } else if (state !== 'loading') {
+      toggleAnalyse(cvId)
+    }
   }
 
   const candidatsFiltres = candidats.filter((c) => c.score_global >= seuilAffichage)
@@ -136,6 +181,12 @@ export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props)
           <div className="flex flex-col gap-3">
             {candidatsFiltres.map((c) => {
               const expanded = candidatExpanded === c.cv_id
+              const analyseState = analysesIA[c.cv_id]
+              const analyseOuverte = analyseExpanded === c.cv_id
+              const analyse = (analyseState !== 'loading' && analyseState !== null && analyseState !== undefined)
+                ? analyseState as AnalyseIA
+                : null
+
               let compInfo: string | undefined
               if (c.details_json) {
                 try {
@@ -146,6 +197,7 @@ export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props)
                   }
                 } catch { /* ignore */ }
               }
+
               return (
                 <div key={c.cv_id} className="border border-gray-200 rounded-lg p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -168,12 +220,29 @@ export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props)
                         {c.localisation_preferee && <span>{c.localisation_preferee}</span>}
                       </div>
                     </div>
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex gap-2 shrink-0 flex-wrap justify-end">
                       <button
                         onClick={() => toggleExpand(c.cv_id)}
                         className="text-xs text-gray-500 hover:text-adh-orange border border-gray-200 rounded px-2 py-1 hover:border-adh-orange transition-colors"
                       >
                         {expanded ? 'Masquer ▲' : 'Détail du score ▼'}
+                      </button>
+                      <button
+                        onClick={() => handleAnalyseBtnClick(c.cv_id)}
+                        disabled={analyseState === 'loading'}
+                        className={`text-xs border rounded px-2 py-1 transition-colors ${
+                          analyseState === 'loading'
+                            ? 'text-gray-300 border-gray-200 cursor-not-allowed'
+                            : analyse
+                              ? 'text-adh-violet border-adh-violet hover:bg-adh-violet hover:text-white'
+                              : 'text-gray-500 hover:text-adh-violet border-gray-200 hover:border-adh-violet'
+                        }`}
+                      >
+                        {analyseState === 'loading'
+                          ? '⏳ Analyse...'
+                          : analyse
+                            ? (analyseOuverte ? '✨ Analyse IA ▲' : '✨ Analyse IA ▼')
+                            : '✨ Analyse IA'}
                       </button>
                       <button
                         onClick={() => fetchCVComplet(c.cv_id)}
@@ -191,6 +260,81 @@ export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props)
                       <BarreScore label="Expérience"  score={c.score_experience} />
                       <BarreScore label="Contrat"     score={c.score_contrat} />
                       <BarreScore label="Lieu"        score={c.score_lieu} />
+                    </div>
+                  )}
+
+                  {analyseOuverte && analyse && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      {/* Verdict bandeau */}
+                      <div className={`rounded px-3 py-2 mb-3 flex items-center justify-between gap-3 ${verdictClass(analyse.verdict)}`}>
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-sm">{analyse.verdict}</span>
+                          <span className="text-lg font-bold">{analyse.score_ia}%</span>
+                        </div>
+                        <button
+                          onClick={() => chargerAnalyse(c.cv_id, true)}
+                          className="text-xs opacity-80 hover:opacity-100 border border-white/50 rounded px-2 py-0.5 transition-opacity"
+                          title="Relancer l'analyse IA"
+                        >
+                          🔄 Relancer
+                        </button>
+                      </div>
+
+                      {/* Explication */}
+                      <p className="text-xs text-gray-600 mb-3 leading-relaxed">{analyse.explication}</p>
+
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {/* Points forts */}
+                        {analyse.points_forts.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-green-700 mb-1">Points forts</p>
+                            <ul className="flex flex-col gap-1">
+                              {analyse.points_forts.map((p, i) => (
+                                <li key={i} className="text-xs text-gray-600 flex gap-1.5">
+                                  <span className="text-green-600 shrink-0">✓</span>
+                                  <span>{p}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Points faibles */}
+                        {analyse.points_faibles.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-adh-orange mb-1">Points d'attention</p>
+                            <ul className="flex flex-col gap-1">
+                              {analyse.points_faibles.map((p, i) => (
+                                <li key={i} className="text-xs text-gray-600 flex gap-1.5">
+                                  <span className="text-adh-orange shrink-0">⚠️</span>
+                                  <span>{p}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Questions à poser */}
+                      {analyse.questions_a_poser.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-xs font-semibold text-gray-500 mb-1">Questions à poser</p>
+                          <ul className="flex flex-col gap-1">
+                            {analyse.questions_a_poser.map((q, i) => (
+                              <li key={i} className="text-xs text-gray-600 flex gap-1.5">
+                                <span className="text-gray-400 shrink-0">•</span>
+                                <span>{q}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {analyse.date_analyse && (
+                        <p className="text-[10px] text-gray-300 mt-2 text-right">
+                          Analysé le {new Date(analyse.date_analyse).toLocaleDateString('fr-FR')}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

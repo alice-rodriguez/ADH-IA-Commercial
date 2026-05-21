@@ -143,3 +143,27 @@ export async function patchNotesAdh(cvId: number, notes: NotesAdhUpdate): Promis
   if (!r.ok) throw new Error(`Erreur PATCH /notes-adh : ${r.status}`)
   return r.json()
 }
+
+export interface AnalyseIA {
+  score_ia: number
+  verdict: string
+  explication: string
+  points_forts: string[]
+  points_faibles: string[]
+  questions_a_poser: string[]
+  date_analyse: string | null
+}
+
+export async function fetchAnalyseIA(cvId: number, offreId: number): Promise<AnalyseIA | null> {
+  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}/offres/${offreId}/analyse-ia`)
+  if (!r.ok) throw new Error(`Erreur GET analyse IA : ${r.status}`)
+  return r.json()
+}
+
+export async function lancerAnalyseIA(cvId: number, offreId: number): Promise<AnalyseIA> {
+  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}/offres/${offreId}/analyse-ia`, {
+    method: 'POST',
+  })
+  if (!r.ok) throw new Error(`Erreur POST analyse IA : ${r.status}`)
+  return r.json()
+}

@@ -10,6 +10,7 @@ Lancement local :
 """
 
 import logging
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +21,7 @@ from api.database import (
     compter_candidats_par_offre,
     cv_existe,
     get_all_cvs,
+    get_analyse_ia,
     get_candidats_par_offre,
     get_cv_par_id,
     get_offre_par_id,
@@ -31,9 +33,11 @@ from api.database import (
     maj_statut,
     marquer_vue,
     offre_existe,
+    upsert_analyse_ia,
 )
 from api.schemas import (
     CV,
+    AnalyseIA,
     CandidatMatch,
     FavoriUpdate,
     NotesAdhUpdate,
@@ -80,7 +84,7 @@ def liste_offres():
 
 
 @app.get("/api/offres/compteurs-candidats")
-def compteurs_candidats(score_min: int = 40):
+def compteurs_candidats(score_min: int = 30):
     """Retourne {offre_id: {nb, top_score}} pour les badges sur les cartes.
 
     Format : {"1": {"nb": 2, "top": 59}, "5": {"nb": 1, "top": 47}, ...}
@@ -212,6 +216,47 @@ def detail_cv(cv_id: int):
         raise
     except Exception as e:
         raise HTTPException(500, f"Erreur base de données : {e}")
+
+
+# ── Analyses IA ──────────────────────────────────────────────────────────────
+
+
+@app.get("/api/cvs/{cv_id}/offres/{offre_id}/analyse-ia", response_model=Optional[AnalyseIA])
+def get_analyse_ia_endpoint(cv_id: int, offre_id: int):
+    """Retourne l'analyse IA stockée, ou null si absente."""
+    try:
+        if not cv_existe(cv_id):
+            raise HTTPException(404, f"CV {cv_id} non trouvé")
+        if not offre_existe(offre_id):
+            raise HTTPException(404, f"Offre {offre_id} non trouvée")
+        return get_analyse_ia(cv_id, offre_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur base de données : {e}")
+
+
+@app.post("/api/cvs/{cv_id}/offres/{offre_id}/analyse-ia", response_model=AnalyseIA)
+def post_analyse_ia_endpoint(cv_id: int, offre_id: int):
+    """Lance une nouvelle analyse IA (Haiku) et la stocke (UPSERT)."""
+    try:
+        cv = get_cv_par_id(cv_id)
+        if cv is None:
+            raise HTTPException(404, f"CV {cv_id} non trouvé")
+        offre = get_offre_par_id(offre_id)
+        if offre is None:
+            raise HTTPException(404, f"Offre {offre_id} non trouvée")
+        from src.matching.analyse_ia import analyser_couple
+        analyse = analyser_couple(cv, offre)
+        if analyse is None:
+            raise HTTPException(503, "L'analyse IA a échoué (API indisponible ou clé manquante)")
+        upsert_analyse_ia(cv_id, offre_id, analyse)
+        stored = get_analyse_ia(cv_id, offre_id)
+        return stored
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur : {e}")
 
 
 @app.patch("/api/cvs/{cv_id}/notes-adh", response_model=CV)
