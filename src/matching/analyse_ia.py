@@ -112,6 +112,12 @@ def analyser_couple(cv: dict, offre: dict, scores: dict | None = None) -> dict |
             messages=[{"role": "user", "content": prompt}],
         )
         text = message.content[0].text.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text
+            if text.startswith("json"):
+                text = text[4:].lstrip("\n")
+            if text.endswith("```"):
+                text = text[:-3].rstrip()
         result = json.loads(text)
         required = {
             "score_ia", "verdict", "explication",

@@ -82,7 +82,24 @@ export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props)
 
   useEffect(() => {
     fetchCandidats(offreId)
-      .then(setCandidats)
+      .then(async (candidatsData) => {
+        setCandidats(candidatsData)
+        const analyses = await Promise.all(
+          candidatsData.map(async (c) => {
+            try {
+              const a = await fetchAnalyseIA(c.cv_id, offreId)
+              return { cvId: c.cv_id, analyse: a }
+            } catch {
+              return { cvId: c.cv_id, analyse: null }
+            }
+          })
+        )
+        const map: Record<number, AnalyseIA> = {}
+        analyses.forEach(({ cvId, analyse }) => {
+          if (analyse) map[cvId] = analyse
+        })
+        setAnalysesIA(map)
+      })
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [offreId])
@@ -258,8 +275,10 @@ export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props)
                       <BarreScore label="Compétences" score={c.score_competences} info={compInfo} />
                       <BarreScore label="Domaine"     score={c.score_domaine} />
                       <BarreScore label="Expérience"  score={c.score_experience} />
-                      <BarreScore label="Contrat"     score={c.score_contrat} />
-                      <BarreScore label="Lieu"        score={c.score_lieu} />
+                      <p className="text-[11px] text-gray-400 mt-2 italic leading-snug">
+                        Score pré-filtre basé sur les mots-clés. Pour une évaluation
+                        métier complète, lance l'analyse IA →
+                      </p>
                     </div>
                   )}
 
