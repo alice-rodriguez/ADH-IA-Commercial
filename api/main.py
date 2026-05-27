@@ -10,10 +10,13 @@ Lancement local :
 """
 
 import logging
+import json as _json
+from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +205,112 @@ def liste_cvs():
         return get_all_cvs()
     except Exception as e:
         raise HTTPException(500, f"Erreur base de données : {e}")
+
+
+@app.post("/api/cvs/upload")
+async def upload_cv(file: UploadFile = File(...)):
+    """Upload d'un PDF : sauvegarde + extraction + profilage + matchings (SSE)."""
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(400, "Seuls les fichiers PDF sont acceptés")
+
+    if file.content_type and "pdf" not in file.content_type.lower():
+        raise HTTPException(400, "Content-type incorrect (attendu : application/pdf)")
+
+    contenu = await file.read()
+    if len(contenu) > 10 * 1024 * 1024:
+        raise HTTPException(413, "Fichier trop volumineux (max 10 MB)")
+
+    cvs_dir = Path("cvs")
+    cvs_dir.mkdir(exist_ok=True)
+    destination = cvs_dir / file.filename
+    if destination.exists():
+        raise HTTPException(
+            409,
+            f"Un fichier nommé « {file.filename} » existe déjà. Renomme ton fichier.",
+        )
+
+    destination.write_bytes(contenu)
+    nom_fichier = file.filename
+
+    from src.cvs.ajout import ajouter_cv_depuis_pdf, profiler_un_cv
+    from src.matching.calculer import recalculer_pour_cv
+
+    def stream():
+        yield "data: " + _json.dumps(
+            {"step": "upload", "status": "ok",
+             "message": f"Fichier sauvegardé : {nom_fichier}"},
+            ensure_ascii=False,
+        ) + "\n\n"
+
+        try:
+            cv_id = ajouter_cv_depuis_pdf(destination)
+        except Exception as e:
+            destination.unlink(missing_ok=True)
+            yield "data: " + _json.dumps(
+                {"step": "extract", "status": "error", "message": str(e)},
+                ensure_ascii=False,
+            ) + "\n\n"
+            return
+
+        yield "data: " + _json.dumps(
+            {"step": "extract", "status": "ok",
+             "message": f"Texte extrait et CV enregistré"},
+            ensure_ascii=False,
+        ) + "\n\n"
+
+        yield "data: " + _json.dumps(
+            {"step": "profile", "status": "in_progress",
+             "message": "Profilage Haiku en cours..."},
+            ensure_ascii=False,
+        ) + "\n\n"
+
+        try:
+            profil = profiler_un_cv(cv_id)
+            profil_data = {
+                "nom_candidat":      profil.get("nom_candidat"),
+                "titre_courant":     profil.get("titre_courant"),
+                "annees_experience": profil.get("annees_experience"),
+                "nb_competences":    len(profil.get("competences_techniques") or []),
+                "nb_domaines":       len(profil.get("domaines") or []),
+            }
+        except Exception as e:
+            yield "data: " + _json.dumps(
+                {"step": "profile", "status": "error", "message": str(e)},
+                ensure_ascii=False,
+            ) + "\n\n"
+            return
+
+        yield "data: " + _json.dumps(
+            {"step": "profile", "status": "ok", "data": profil_data},
+            ensure_ascii=False,
+        ) + "\n\n"
+
+        yield "data: " + _json.dumps(
+            {"step": "matchings", "status": "in_progress",
+             "message": "Calcul des matchings..."},
+            ensure_ascii=False,
+        ) + "\n\n"
+
+        try:
+            nb = recalculer_pour_cv(cv_id)
+        except Exception as e:
+            yield "data: " + _json.dumps(
+                {"step": "matchings", "status": "error", "message": str(e)},
+                ensure_ascii=False,
+            ) + "\n\n"
+            return
+
+        yield "data: " + _json.dumps(
+            {"step": "matchings", "status": "ok", "data": {"nb_matchings": nb}},
+            ensure_ascii=False,
+        ) + "\n\n"
+
+        yield "data: " + _json.dumps(
+            {"step": "done", "status": "ok", "data": {"cv_id": cv_id}},
+            ensure_ascii=False,
+        ) + "\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
 
 
 @app.get("/api/cvs/{cv_id}", response_model=CV)

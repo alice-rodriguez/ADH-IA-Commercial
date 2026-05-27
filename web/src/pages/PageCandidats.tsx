@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { CV } from '../api'
 import { fetchCVs } from '../api'
 import EditeurNotesAdh from '../components/EditeurNotesAdh'
+import ModaleAjoutCv from '../components/ModaleAjoutCv'
 
 const STATUT_BADGE: Record<string, string> = {
   actif:    'bg-green-100 text-green-700',
@@ -29,6 +30,7 @@ export default function PageCandidats() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cvSelectionneId, setCvSelectionneId] = useState<number | null>(null)
+  const [modaleAjoutOuverte, setModaleAjoutOuverte] = useState(false)
 
   useEffect(() => {
     fetchCVs()
@@ -42,20 +44,36 @@ export default function PageCandidats() {
     setCvSelectionneId(null)
   }
 
+  async function handleCvAjoute(cvId: number) {
+    const nouvelleListe = await fetchCVs().catch(() => cvs)
+    setCvs(nouvelleListe)
+    setModaleAjoutOuverte(false)
+    setCvSelectionneId(cvId)
+  }
+
   const statut = (cv: CV) => cv.statut_relation ?? 'actif'
 
   return (
+    <>
     <main className="flex-1 p-6 md:p-8">
       {/* En-tête de page */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-adh-black">
-          Mes candidats — {cvs.length} CV{cvs.length > 1 ? 's' : ''}
-        </h1>
-        {!loading && cvs.length > 0 && (
-          <p className="text-sm text-gray-500 mt-1">
-            Cliquez sur une ligne pour éditer le profil ADH
-          </p>
-        )}
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-adh-black">
+            Mes candidats — {cvs.length} CV{cvs.length > 1 ? 's' : ''}
+          </h1>
+          {!loading && cvs.length > 0 && (
+            <p className="text-sm text-gray-500 mt-1">
+              Cliquez sur une ligne pour éditer le profil ADH
+            </p>
+          )}
+        </div>
+        <button
+          onClick={() => setModaleAjoutOuverte(true)}
+          className="bg-adh-orange text-white text-sm font-semibold px-4 py-2 rounded hover:opacity-90 shrink-0"
+        >
+          + Ajouter un candidat
+        </button>
       </div>
 
       {loading && (
@@ -72,8 +90,9 @@ export default function PageCandidats() {
       {!loading && !error && cvs.length === 0 && (
         <div className="max-w-lg mx-auto mt-16 text-center">
           <p className="text-gray-400 text-lg mb-2">Aucun candidat en BDD.</p>
-          <p className="text-gray-400 text-sm font-mono">
-            Lance <span className="bg-gray-100 px-2 py-0.5 rounded">python -m src.cvs.scan</span> dans le dossier projet pour profiler tes CVs.
+          <p className="text-gray-400 text-sm mb-4">
+            Utilise le bouton <span className="font-semibold text-adh-orange">+ Ajouter un candidat</span> ou lance{' '}
+            <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">python -m src.cvs.scan</span>.
           </p>
         </div>
       )}
@@ -154,5 +173,13 @@ export default function PageCandidats() {
         </div>
       )}
     </main>
+
+    {modaleAjoutOuverte && (
+      <ModaleAjoutCv
+        onClose={() => setModaleAjoutOuverte(false)}
+        onCvAjoute={handleCvAjoute}
+      />
+    )}
+    </>
   )
 }

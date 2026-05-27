@@ -167,3 +167,56 @@ export async function lancerAnalyseIA(cvId: number, offreId: number): Promise<An
   if (!r.ok) throw new Error(`Erreur POST analyse IA : ${r.status}`)
   return r.json()
 }
+
+export type UploadEvent =
+  | { step: 'upload';    status: 'ok';          message: string }
+  | { step: 'extract';   status: 'ok';          message: string }
+  | { step: 'extract';   status: 'error';       message: string }
+  | { step: 'profile';   status: 'in_progress'; message: string }
+  | { step: 'profile';   status: 'ok';          data: { nom_candidat: string | null; titre_courant: string | null; annees_experience: number | null; nb_competences: number; nb_domaines: number } }
+  | { step: 'profile';   status: 'error';       message: string }
+  | { step: 'matchings'; status: 'in_progress'; message: string }
+  | { step: 'matchings'; status: 'ok';          data: { nb_matchings: number } }
+  | { step: 'matchings'; status: 'error';       message: string }
+  | { step: 'done';      status: 'ok';          data: { cv_id: number } }
+
+export async function uploaderCv(
+  file: File,
+  onEvent: (e: UploadEvent) => void,
+): Promise<void> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const r = await fetch(`${API_BASE_URL}/api/cvs/upload`, {
+    method: 'POST',
+    body: formData,
+  })
+
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '')
+    throw new Error(`HTTP ${r.status} : ${txt || r.statusText}`)
+  }
+
+  const reader = r.body!.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+
+    const lines = buffer.split('\n\n')
+    buffer = lines.pop() || ''
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      try {
+        const event = JSON.parse(line.slice(6)) as UploadEvent
+        onEvent(event)
+      } catch (e) {
+        console.error('Parse SSE error :', e, line)
+      }
+    }
+  }
+}
