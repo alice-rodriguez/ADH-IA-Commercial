@@ -14,9 +14,16 @@ import json as _json
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
+
+from src.auth.sessions import creer_session, supprimer_session, valider_session
+from src.auth.users import (
+    creer_user, get_user_par_id, get_user_par_username,
+    list_users, reset_password, supprimer_user,
+)
+from src.auth.passwords import verify_password
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +49,15 @@ from api.schemas import (
     CV,
     AnalyseIA,
     CandidatMatch,
+    CreateUserRequest,
     FavoriUpdate,
+    LoginRequest,
     NotesAdhUpdate,
     NotesUpdate,
     Offre,
+    ResetPasswordRequest,
     StatutUpdate,
+    UserOut,
 )
 
 VERSION = "0.1.0"
@@ -67,6 +78,118 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+_ROUTES_PUBLIQUES = {
+    "/api/auth/login",
+    "/api/auth/me",
+    "/health",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+}
+
+
+@app.middleware("http")
+async def middleware_auth(request: Request, call_next):
+    chemin = request.url.path
+
+    # Requêtes non-API et preflight CORS passent sans auth
+    if not chemin.startswith("/api/") or request.method == "OPTIONS":
+        return await call_next(request)
+
+    # Routes publiques (login, me, health…)
+    if chemin in _ROUTES_PUBLIQUES:
+        return await call_next(request)
+
+    token = request.cookies.get("session_token")
+    if not token:
+        return JSONResponse({"detail": "Non authentifié"}, status_code=401)
+
+    session = valider_session(token)
+    if session is None:
+        return JSONResponse({"detail": "Session expirée"}, status_code=401)
+
+    request.state.user = session
+    return await call_next(request)
+
+
+# ── Auth ─────────────────────────────────────────────────────────────────────
+
+
+@app.post("/api/auth/login")
+def login(body: LoginRequest, response: Response):
+    user = get_user_par_username(body.username)
+    if user is None or not verify_password(body.password, user["password_hash"]):
+        raise HTTPException(401, "Identifiants invalides")
+
+    token, _ = creer_session(user["id"])
+    response.set_cookie(
+        key="session_token",
+        value=token,
+        max_age=7 * 24 * 3600,
+        httponly=True,
+        samesite="lax",
+        secure=False,  # True en production (Session H)
+    )
+    return {"username": user["username"]}
+
+
+@app.post("/api/auth/logout")
+def logout(request: Request, response: Response):
+    token = request.cookies.get("session_token")
+    if token:
+        supprimer_session(token)
+    response.delete_cookie("session_token")
+    return {"detail": "Déconnecté"}
+
+
+@app.get("/api/auth/me")
+def me(request: Request):
+    token = request.cookies.get("session_token")
+    if not token:
+        raise HTTPException(401, "Non authentifié")
+    session = valider_session(token)
+    if session is None:
+        raise HTTPException(401, "Session expirée")
+    return {"username": session["username"], "user_id": session["user_id"]}
+
+
+# ── Utilisateurs ─────────────────────────────────────────────────────────────
+
+
+@app.get("/api/users", response_model=list[UserOut])
+def liste_users_endpoint():
+    return list_users()
+
+
+@app.post("/api/users", response_model=UserOut)
+def creer_user_endpoint(body: CreateUserRequest):
+    if len(body.password) < 8:
+        raise HTTPException(422, "Mot de passe trop court (min 8 caractères)")
+    try:
+        user_id = creer_user(body.username, body.password)
+        return get_user_par_id(user_id)
+    except Exception as e:
+        if "UNIQUE" in str(e):
+            raise HTTPException(409, "Ce nom d'utilisateur existe déjà")
+        raise HTTPException(500, str(e))
+
+
+@app.delete("/api/users/{user_id}")
+def supprimer_user_endpoint(user_id: int, request: Request):
+    if request.state.user["user_id"] == user_id:
+        raise HTTPException(400, "Tu ne peux pas te supprimer toi-même")
+    supprimer_user(user_id)
+    return {"detail": "Supprimé"}
+
+
+@app.post("/api/users/{user_id}/reset-password")
+def reset_password_endpoint(user_id: int, body: ResetPasswordRequest):
+    if len(body.new_password) < 8:
+        raise HTTPException(422, "Mot de passe trop court (min 8 caractères)")
+    reset_password(user_id, body.new_password)
+    return {"detail": "Mot de passe réinitialisé"}
 
 
 @app.get("/health")

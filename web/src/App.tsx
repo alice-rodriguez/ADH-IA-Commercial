@@ -1,11 +1,32 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { AuthProvider, useAuth } from './auth/AuthContext'
 import PageCandidats from './pages/PageCandidats'
+import PageLogin from './pages/PageLogin'
 import PageOffres from './pages/PageOffres'
+import PageUsers from './pages/PageUsers'
 
-type Page = 'offres' | 'candidats'
+type Page = 'login' | 'offres' | 'candidats' | 'users'
 
-function App() {
+function AppInner() {
+  const { user, isLoading, logout } = useAuth()
   const [page, setPage] = useState<Page>('offres')
+
+  useEffect(() => {
+    if (!isLoading && !user) setPage('login')
+    if (!isLoading && user && page === 'login') setPage('offres')
+  }, [isLoading, user])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-adh-black flex items-center justify-center">
+        <div className="text-white text-sm">Chargement…</div>
+      </div>
+    )
+  }
+
+  if (page === 'login') {
+    return <PageLogin onLoggedIn={() => setPage('offres')} />
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -27,12 +48,36 @@ function App() {
           >
             Candidats
           </button>
+          <button
+            onClick={() => setPage('users')}
+            className={page === 'users' ? 'text-adh-orange font-semibold' : 'text-white hover:text-adh-orange transition-colors'}
+          >
+            Utilisateurs
+          </button>
         </nav>
+        <div className="flex items-center gap-3">
+          <span className="text-gray-400 text-sm">{user?.username}</span>
+          <button
+            onClick={logout}
+            className="text-white text-sm border border-white/30 rounded-lg px-3 py-1 hover:bg-white/10 transition-colors"
+          >
+            Déconnexion
+          </button>
+        </div>
       </header>
 
       {page === 'offres' && <PageOffres />}
       {page === 'candidats' && <PageCandidats />}
+      {page === 'users' && <PageUsers />}
     </div>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   )
 }
 

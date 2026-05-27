@@ -6,6 +6,26 @@ from typing import Literal, Optional
 from pydantic import BaseModel
 
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class UserOut(BaseModel):
+    id: int
+    username: str
+    date_creation: str
+
+
+class CreateUserRequest(BaseModel):
+    username: str
+    password: str
+
+
+class ResetPasswordRequest(BaseModel):
+    new_password: str
+
+
 class CV(BaseModel):
     """Représentation complète d'un CV (profilage Haiku + Notes ADH)."""
 

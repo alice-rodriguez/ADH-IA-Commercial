@@ -3,7 +3,7 @@ import type { Offre } from './types'
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export async function fetchOffres(): Promise<Offre[]> {
-  const response = await fetch(`${API_BASE_URL}/api/offres`)
+  const response = await fetch(`${API_BASE_URL}/api/offres`, { credentials: 'include' })
   if (!response.ok) {
     throw new Error(`Erreur API ${response.status}: ${response.statusText}`)
   }
@@ -11,7 +11,7 @@ export async function fetchOffres(): Promise<Offre[]> {
 }
 
 export async function patchVue(id: number): Promise<Offre> {
-  const r = await fetch(`${API_BASE_URL}/api/offres/${id}/vue`, { method: 'PATCH' })
+  const r = await fetch(`${API_BASE_URL}/api/offres/${id}/vue`, { method: 'PATCH', credentials: 'include' })
   if (!r.ok) throw new Error(`Erreur PATCH /vue : ${r.status}`)
   return r.json()
 }
@@ -21,6 +21,7 @@ export async function patchFavori(id: number, favori: boolean): Promise<Offre> {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ favori }),
+    credentials: 'include',
   })
   if (!r.ok) throw new Error(`Erreur PATCH /favori : ${r.status}`)
   return r.json()
@@ -31,6 +32,7 @@ export async function patchStatut(id: number, statut: string): Promise<Offre> {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ statut }),
+    credentials: 'include',
   })
   if (!r.ok) throw new Error(`Erreur PATCH /statut : ${r.status}`)
   return r.json()
@@ -41,6 +43,7 @@ export async function patchNotes(id: number, notes: string | null): Promise<Offr
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ notes }),
+    credentials: 'include',
   })
   if (!r.ok) throw new Error(`Erreur PATCH /notes : ${r.status}`)
   return r.json()
@@ -69,15 +72,14 @@ export interface CompteurCandidat {
 }
 
 export async function fetchCompteurs(scoreMin: number = 40): Promise<Record<number, CompteurCandidat>> {
-  const r = await fetch(`${API_BASE_URL}/api/offres/compteurs-candidats?score_min=${scoreMin}`)
+  const r = await fetch(`${API_BASE_URL}/api/offres/compteurs-candidats?score_min=${scoreMin}`, { credentials: 'include' })
   if (!r.ok) throw new Error(`Erreur compteurs : ${r.status}`)
   const raw: Record<string, CompteurCandidat> = await r.json()
-  // Les clés arrivent en string depuis JSON, on les recast en number
   return Object.fromEntries(Object.entries(raw).map(([k, v]) => [Number(k), v]))
 }
 
 export async function fetchCandidats(offreId: number): Promise<Candidat[]> {
-  const r = await fetch(`${API_BASE_URL}/api/offres/${offreId}/candidats`)
+  const r = await fetch(`${API_BASE_URL}/api/offres/${offreId}/candidats`, { credentials: 'include' })
   if (!r.ok) throw new Error(`Erreur candidats : ${r.status}`)
   return r.json()
 }
@@ -123,13 +125,13 @@ export interface NotesAdhUpdate {
 }
 
 export async function fetchCVs(): Promise<CV[]> {
-  const r = await fetch(`${API_BASE_URL}/api/cvs`)
+  const r = await fetch(`${API_BASE_URL}/api/cvs`, { credentials: 'include' })
   if (!r.ok) throw new Error(`Erreur GET /api/cvs : ${r.status}`)
   return r.json()
 }
 
 export async function fetchCVParId(cvId: number): Promise<CV> {
-  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}`)
+  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}`, { credentials: 'include' })
   if (!r.ok) throw new Error(`Erreur GET /api/cvs/${cvId} : ${r.status}`)
   return r.json()
 }
@@ -139,6 +141,7 @@ export async function patchNotesAdh(cvId: number, notes: NotesAdhUpdate): Promis
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(notes),
+    credentials: 'include',
   })
   if (!r.ok) throw new Error(`Erreur PATCH /notes-adh : ${r.status}`)
   return r.json()
@@ -155,7 +158,7 @@ export interface AnalyseIA {
 }
 
 export async function fetchAnalyseIA(cvId: number, offreId: number): Promise<AnalyseIA | null> {
-  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}/offres/${offreId}/analyse-ia`)
+  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}/offres/${offreId}/analyse-ia`, { credentials: 'include' })
   if (!r.ok) throw new Error(`Erreur GET analyse IA : ${r.status}`)
   return r.json()
 }
@@ -163,6 +166,7 @@ export async function fetchAnalyseIA(cvId: number, offreId: number): Promise<Ana
 export async function lancerAnalyseIA(cvId: number, offreId: number): Promise<AnalyseIA> {
   const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}/offres/${offreId}/analyse-ia`, {
     method: 'POST',
+    credentials: 'include',
   })
   if (!r.ok) throw new Error(`Erreur POST analyse IA : ${r.status}`)
   return r.json()
@@ -190,6 +194,7 @@ export async function uploaderCv(
   const r = await fetch(`${API_BASE_URL}/api/cvs/upload`, {
     method: 'POST',
     body: formData,
+    credentials: 'include',
   })
 
   if (!r.ok) {
@@ -218,5 +223,89 @@ export async function uploaderCv(
         console.error('Parse SSE error :', e, line)
       }
     }
+  }
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+
+export interface User {
+  id: number
+  username: string
+  date_creation: string
+}
+
+export interface AuthMe {
+  username: string
+  user_id: number
+}
+
+export async function login(username: string, password: string): Promise<void> {
+  const r = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+    credentials: 'include',
+  })
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    throw new Error(data.detail || `Erreur ${r.status}`)
+  }
+}
+
+export async function logout(): Promise<void> {
+  await fetch(`${API_BASE_URL}/api/auth/logout`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+}
+
+export async function fetchMe(): Promise<AuthMe | null> {
+  const r = await fetch(`${API_BASE_URL}/api/auth/me`, { credentials: 'include' })
+  if (r.status === 401) return null
+  if (!r.ok) throw new Error(`Erreur /me : ${r.status}`)
+  return r.json()
+}
+
+export async function fetchUsers(): Promise<User[]> {
+  const r = await fetch(`${API_BASE_URL}/api/users`, { credentials: 'include' })
+  if (!r.ok) throw new Error(`Erreur GET /api/users : ${r.status}`)
+  return r.json()
+}
+
+export async function creerUser(username: string, password: string): Promise<User> {
+  const r = await fetch(`${API_BASE_URL}/api/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+    credentials: 'include',
+  })
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    throw new Error(data.detail || `Erreur ${r.status}`)
+  }
+  return r.json()
+}
+
+export async function supprimerUser(userId: number): Promise<void> {
+  const r = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    throw new Error(data.detail || `Erreur ${r.status}`)
+  }
+}
+
+export async function resetPassword(userId: number, newPassword: string): Promise<void> {
+  const r = await fetch(`${API_BASE_URL}/api/users/${userId}/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ new_password: newPassword }),
+    credentials: 'include',
+  })
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    throw new Error(data.detail || `Erreur ${r.status}`)
   }
 }
