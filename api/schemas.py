@@ -146,3 +146,22 @@ class CandidatMatch(BaseModel):
     score_lieu: int
     details_json: Optional[str]
     date_calcul: Optional[str]
+
+
+class OffreMatch(BaseModel):
+    """Une offre matchée pour un CV."""
+
+    offre_id: int
+    titre: str
+    entreprise: Optional[str] = None
+    lieu: Optional[str] = None
+    type_contrat: Optional[str] = None
+    url: Optional[str] = None
+    date_collecte: Optional[str] = None
+    score_global: int
+    score_competences: int
+    score_domaine: int
+    score_experience: int
+    score_contrat: int
+    score_lieu: int
+    details_json: Optional[str] = None

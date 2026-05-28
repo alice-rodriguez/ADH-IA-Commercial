@@ -35,6 +35,7 @@ from api.database import (
     get_candidats_par_offre,
     get_cv_par_id,
     get_offre_par_id,
+    get_offres_par_cv,
     get_offres_recentes,
     get_top_score_par_offre,
     maj_favori,
@@ -55,6 +56,7 @@ from api.schemas import (
     NotesAdhUpdate,
     NotesUpdate,
     Offre,
+    OffreMatch,
     ResetPasswordRequest,
     StatutUpdate,
     UserOut,
@@ -451,6 +453,19 @@ def detail_cv(cv_id: int):
 
 
 # ── Analyses IA ──────────────────────────────────────────────────────────────
+
+
+@app.get("/api/cvs/{cv_id}/offres", response_model=list[OffreMatch])
+def offres_pour_cv(cv_id: int, score_min: int = 30):
+    """Offres matchées pour un CV donné, triées par score_global DESC."""
+    try:
+        if not cv_existe(cv_id):
+            raise HTTPException(404, f"CV {cv_id} non trouvé")
+        return get_offres_par_cv(cv_id, score_min=score_min)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur base de données : {e}")
 
 
 @app.get("/api/cvs/{cv_id}/offres/{offre_id}/analyse-ia", response_model=Optional[AnalyseIA])

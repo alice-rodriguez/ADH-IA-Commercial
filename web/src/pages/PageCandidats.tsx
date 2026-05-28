@@ -3,6 +3,7 @@ import type { CV } from '../api'
 import { fetchCVs } from '../api'
 import EditeurNotesAdh from '../components/EditeurNotesAdh'
 import ModaleAjoutCv from '../components/ModaleAjoutCv'
+import ModaleOffres from '../components/ModaleOffres'
 
 const STATUT_BADGE: Record<string, string> = {
   actif:    'bg-green-100 text-green-700',
@@ -31,6 +32,7 @@ export default function PageCandidats() {
   const [error, setError] = useState<string | null>(null)
   const [cvSelectionneId, setCvSelectionneId] = useState<number | null>(null)
   const [modaleAjoutOuverte, setModaleAjoutOuverte] = useState(false)
+  const [modaleOffresCv, setModaleOffresCv] = useState<{ cvId: number; nom: string } | null>(null)
 
   useEffect(() => {
     fetchCVs()
@@ -108,6 +110,7 @@ export default function PageCandidats() {
                 <th className="text-left px-4 py-3">TJM</th>
                 <th className="text-left px-4 py-3">Lieu / Mobilité</th>
                 <th className="text-left px-4 py-3">Dernier contact</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -152,16 +155,25 @@ export default function PageCandidats() {
                     <td className="px-4 py-3 text-gray-500">
                       {formatDate(cv.date_dernier_contact)}
                     </td>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => setModaleOffresCv({ cvId: cv.id, nom: cv.nom_candidat ?? cv.nom_fichier })}
+                        className="text-xs text-gray-500 hover:text-adh-orange border border-gray-200 rounded px-2 py-1 hover:border-adh-orange transition-colors whitespace-nowrap"
+                      >
+                        🎯 Offres compatibles
+                      </button>
+                    </td>
                   </tr>
 
                   {cvSelectionneId === cv.id && (
                     <tr key={`editor-${cv.id}`}>
-                      <td colSpan={6} className="px-4 pb-4">
+                      <td colSpan={7} className="px-4 pb-4">
                         <EditeurNotesAdh
                           cv={cv}
                           mode="inline"
                           onSauvegarde={handleSauvegarde}
                           onAnnuler={() => setCvSelectionneId(null)}
+                          onVoirOffres={(cvId, nom) => setModaleOffresCv({ cvId, nom })}
                         />
                       </td>
                     </tr>
@@ -178,6 +190,14 @@ export default function PageCandidats() {
       <ModaleAjoutCv
         onClose={() => setModaleAjoutOuverte(false)}
         onCvAjoute={handleCvAjoute}
+      />
+    )}
+
+    {modaleOffresCv && (
+      <ModaleOffres
+        cvId={modaleOffresCv.cvId}
+        nomCandidat={modaleOffresCv.nom}
+        onClose={() => setModaleOffresCv(null)}
       />
     )}
     </>

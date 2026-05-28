@@ -341,8 +341,8 @@ def upsert_analyse_ia(cv_id: int, offre_id: int, analyse: dict) -> None:
         )
 
 
-def get_offres_par_cv(cv_id: int, limit: int = 20) -> list[dict]:
-    """Retourne les offres matchées pour un CV, triées par score_global DESC."""
+def get_offres_par_cv(cv_id: int, score_min: int = 30) -> list[dict]:
+    """Retourne les offres matchées pour un CV, triées par score_global DESC, filtrées par score_min."""
     with _connexion() as conn:
         rows = conn.execute(
             """
@@ -351,8 +351,8 @@ def get_offres_par_cv(cv_id: int, limit: int = 20) -> list[dict]:
                 o.titre,
                 o.entreprise,
                 o.lieu,
+                o.type_contrat,
                 o.type_contrat_clarifie,
-                o.source,
                 o.url,
                 o.date_collecte,
                 m.score_global,
@@ -361,13 +361,12 @@ def get_offres_par_cv(cv_id: int, limit: int = 20) -> list[dict]:
                 m.score_experience,
                 m.score_contrat,
                 m.score_lieu,
-                m.date_calcul
+                m.details_json
             FROM matchings m
             JOIN offres o ON o.id = m.offre_id
-            WHERE m.cv_id = ?
+            WHERE m.cv_id = ? AND m.score_global >= ?
             ORDER BY m.score_global DESC
-            LIMIT ?
             """,
-            (cv_id, limit),
+            (cv_id, score_min),
         ).fetchall()
     return [dict(r) for r in rows]

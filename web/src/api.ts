@@ -226,6 +226,31 @@ export async function uploaderCv(
   }
 }
 
+// ── Matching CV → Offres ─────────────────────────────────────────────────────
+
+export interface OffreMatch {
+  offre_id: number
+  titre: string
+  entreprise: string | null
+  lieu: string | null
+  type_contrat: string | null
+  url: string | null
+  date_collecte: string | null
+  score_global: number
+  score_competences: number
+  score_domaine: number
+  score_experience: number
+  score_contrat: number
+  score_lieu: number
+  details_json: string | null
+}
+
+export async function fetchOffresParCv(cvId: number, scoreMin: number = 30): Promise<OffreMatch[]> {
+  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}/offres?score_min=${scoreMin}`, { credentials: 'include' })
+  if (!r.ok) throw new Error(`Erreur GET offres par CV : ${r.status}`)
+  return r.json()
+}
+
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 export interface User {

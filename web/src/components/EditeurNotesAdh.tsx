@@ -19,9 +19,10 @@ interface Props {
   mode: 'inline' | 'modale'
   onSauvegarde: (cv: CV) => void
   onAnnuler: () => void
+  onVoirOffres?: (cvId: number, nom: string) => void
 }
 
-export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler }: Props) {
+export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onVoirOffres }: Props) {
   const [tjm_negocie, setTjmNegocie] = useState<number | null>(cv.tjm_negocie)
   const [salaire_negocie, setSalaireNegocie] = useState<number | null>(cv.salaire_negocie)
   const [postes_cibles, setPostesCibles] = useState(cv.postes_cibles ?? '')
@@ -91,7 +92,17 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler }: P
     <div className={mode === 'modale' ? 'max-w-2xl mx-auto mt-20 mb-10 bg-white rounded-lg shadow-xl p-6' : ''}>
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-5">
-        <h2 className="text-lg font-bold text-adh-black">{titre}</h2>
+        <div className="flex flex-col gap-2">
+          <h2 className="text-lg font-bold text-adh-black">{titre}</h2>
+          {onVoirOffres && (
+            <button
+              onClick={() => onVoirOffres(cv.id, cv.nom_candidat ?? cv.nom_fichier)}
+              className="self-start text-xs text-gray-500 hover:text-adh-orange border border-gray-200 rounded px-2 py-1 hover:border-adh-orange transition-colors"
+            >
+              🎯 Voir ses offres compatibles
+            </button>
+          )}
+        </div>
         {mode === 'modale' && (
           <button
             onClick={onAnnuler}
