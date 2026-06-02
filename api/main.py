@@ -16,9 +16,10 @@ from typing import Optional
 
 from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from src.auth.sessions import creer_session, supprimer_session, valider_session
+from src.cv_genere.pdf import generer_pdf
 from src.auth.users import (
     creer_user, get_user_par_id, get_user_par_username,
     list_users, reset_password, supprimer_user,
@@ -63,6 +64,9 @@ from api.schemas import (
 )
 
 VERSION = "0.1.0"
+
+CONTACT_EMAIL_PAR_DEFAUT = "contact@adhpmconsulting.com"
+CONTACT_TELEPHONE_PAR_DEFAUT = "+33 7 89 39 82 24"
 
 app = FastAPI(
     title="ADH Veille — API",
@@ -532,3 +536,28 @@ def patch_notes_adh(cv_id: int, body: NotesAdhUpdate):
         raise HTTPException(422, str(e))
     except Exception as e:
         raise HTTPException(500, f"Erreur base de données : {e}")
+
+
+@app.post("/api/cvs/{cv_id}/offres/{offre_id}/generer-cv")
+def generer_cv_endpoint(cv_id: int, offre_id: int):
+    """Génère un PDF CV adapté ADH pour ce couple (cv, offre) et le retourne en téléchargement."""
+    if not cv_existe(cv_id):
+        raise HTTPException(404, f"CV {cv_id} non trouvé")
+    if not offre_existe(offre_id):
+        raise HTTPException(404, f"Offre {offre_id} non trouvée")
+    try:
+        chemin = generer_pdf(
+            cv_id=cv_id,
+            offre_id=offre_id,
+            contact_email=CONTACT_EMAIL_PAR_DEFAUT,
+            contact_telephone=CONTACT_TELEPHONE_PAR_DEFAUT,
+        )
+        return FileResponse(
+            chemin,
+            media_type="application/pdf",
+            filename=f"CV_ADH_IDADH-{cv_id:03d}_offre_{offre_id}.pdf",
+        )
+    except RuntimeError as e:
+        raise HTTPException(500, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Erreur génération CV : {e}")

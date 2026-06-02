@@ -15,3 +15,6 @@ build/
 # CVs des candidats (données personnelles RGPD)
 cvs/*.pdf
 cvs/*.PDF
+
+# CVs générés ADH
+cvs_generes/

@@ -86,7 +86,7 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onV
     if (e.target === overlayRef.current) onAnnuler()
   }
 
-  const titre = `Profil ADH — ${cv.nom_candidat ?? cv.nom_fichier}`
+  const titre = `Profil ADH — ${cv.nom_candidat ?? cv.nom_fichier} · IDADH-${String(cv.id).padStart(3, '0')}`
 
   const contenu = (
     <div className={mode === 'modale' ? 'max-w-2xl mx-auto mt-20 mb-10 bg-white rounded-lg shadow-xl p-6' : ''}>

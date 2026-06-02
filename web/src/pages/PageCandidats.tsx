@@ -104,6 +104,7 @@ export default function PageCandidats() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-xs font-bold uppercase text-gray-500">
               <tr>
+                <th className="text-left px-4 py-3">ID</th>
                 <th className="text-left px-4 py-3">Nom</th>
                 <th className="text-left px-4 py-3">Titre</th>
                 <th className="text-left px-4 py-3">Statut</th>
@@ -123,6 +124,11 @@ export default function PageCandidats() {
                       cvSelectionneId === cv.id ? 'bg-orange-50' : ''
                     }`}
                   >
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-mono text-gray-600">
+                        IDADH-{String(cv.id).padStart(3, '0')}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 font-medium text-adh-black">
                       {cv.nom_candidat ?? cv.nom_fichier}
                     </td>
@@ -167,7 +173,7 @@ export default function PageCandidats() {
 
                   {cvSelectionneId === cv.id && (
                     <tr key={`editor-${cv.id}`}>
-                      <td colSpan={7} className="px-4 pb-4">
+                      <td colSpan={8} className="px-4 pb-4">
                         <EditeurNotesAdh
                           cv={cv}
                           mode="inline"

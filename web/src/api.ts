@@ -334,3 +334,15 @@ export async function resetPassword(userId: number, newPassword: string): Promis
     throw new Error(data.detail || `Erreur ${r.status}`)
   }
 }
+
+export async function genererCvAdapte(cvId: number, offreId: number): Promise<Blob> {
+  const r = await fetch(
+    `${API_BASE_URL}/api/cvs/${cvId}/offres/${offreId}/generer-cv`,
+    { method: 'POST', credentials: 'include' }
+  )
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    throw new Error(data.detail || `Erreur ${r.status}`)
+  }
+  return r.blob()
+}
