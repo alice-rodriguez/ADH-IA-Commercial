@@ -197,3 +197,165 @@ email:
   envoyer_si_vide: true
   # Objet de l'email
   objet: "ADH — Digest Opportunités du {date}"
+
+# ============================================================
+# SYNONYMES MÉTIER — utilisés par src/matching/utils.py
+# Ne pas modifier sans comprendre l'impact sur le scoring.
+# ============================================================
+
+# Variantes de domaines : chaque clé est un domaine canonique,
+# les valeurs sont les formes normalisées (sans accents, lowercase)
+# que l'on cherche dans le texte de l'offre.
+variantes_domaines:
+  banque:
+    - banque
+    - bank
+    - banking
+    - bancaire
+    - finance
+    - financial
+    - financier
+    - trading
+    - traders
+    - bourse
+    - marche
+    - marches financiers
+    - capital markets
+    - capital market
+    - investment banking
+    - bfi
+    - assetsmanagement
+    - asset management
+    - wealth management
+    - private banking
+    - credit
+    - monetique
+    - paiement
+    - payment
+    - swift
+    - sepa
+  assurance:
+    - assurance
+    - insurance
+    - mutuelle
+    - prevoyance
+    - retraite
+    - reassurance
+    - solvabilite
+  it_transformation:
+    - it transformation
+    - digital transformation
+    - transformation digitale
+    - transformation
+    - digitalisation
+    - migration
+    - modernisation
+    - data platform
+    - cloud
+  energie:
+    - energie
+    - energy
+    - utilities
+    - electricite
+    - gaz
+    - petrol
+    - petrole
+    - renouvelable
+  telecom:
+    - telecom
+    - telecommunication
+    - telecommunications
+    - telco
+    - operateur
+    - mobile
+    - internet
+  industrie:
+    - industrie
+    - industrie manufacturiere
+    - manufacturing
+    - automobile
+    - aeronautique
+    - aerospatial
+    - defense
+    - chimie
+    - pharmacie
+  retail:
+    - retail
+    - distribution
+    - grande distribution
+    - commerce
+    - ecommerce
+    - luxe
+    - mode
+  public:
+    - public
+    - secteur public
+    - administration
+    - etat
+    - collectivite
+    - ministere
+    - hopital
+    - sante publique
+  sante:
+    - sante
+    - health
+    - healthcare
+    - medecine
+    - medical
+    - pharma
+    - biotechnologie
+    - biotech
+  transport:
+    - transport
+    - logistique
+    - supply chain
+    - shipping
+    - fret
+    - ferroviaire
+    - aviation
+
+# Synonymes de compétences : chaque clé est une compétence telle
+# qu'elle peut apparaître dans un CV, les valeurs sont les formes
+# équivalentes que l'on cherche dans le texte de l'offre.
+synonymes_competences:
+  "Program Management":
+    - pmo
+    - program manager office
+    - project management office
+    - programme manager
+    - programme management
+  "Agile":
+    - safe
+    - scrum
+    - agilite
+  "SAFe":
+    - scaled agile
+    - agile a l echelle
+  "Stakeholder Management":
+    - gestion des parties prenantes
+    - relation parties prenantes
+  "Risk Management":
+    - gestion des risques
+    - gestion du risque
+  "Budget Planning":
+    - planification budgetaire
+    - budget
+  "KPI Definition":
+    - kpi
+    - indicateurs
+  "Portfolio Management":
+    - gestion de portefeuille
+    - portfolio
+  "Jira":
+    - jira
+    - atlassian
+  "Confluence":
+    - confluence
+  "Banking":
+    - banque
+    - bancaire
+    - finance
+  "Insurance":
+    - assurance
+    - mutuelle
+

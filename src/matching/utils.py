@@ -1,8 +1,12 @@
 """Utilitaires de normalisation et comparaison pour le matching."""
 
+import logging
 import re
 import unicodedata
+from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Normalisation
@@ -34,10 +38,10 @@ def _normaliser_lieu(s: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Variantes domaines métier
+# Fallback : variantes domaines en dur (si YAML absent ou malformé)
 # ---------------------------------------------------------------------------
 
-VARIANTES_DOMAINES: dict[str, list[str]] = {
+_VARIANTES_DOMAINES_FALLBACK: dict[str, list[str]] = {
     "banque": ["banque", "bank", "bancaire", "finance", "financier", "assetsmanagement",
                "bfi", "marches financiers", "capital markets"],
     "assurance": ["assurance", "insurance", "mutuelle", "prevoyance", "retraite"],
@@ -56,6 +60,70 @@ VARIANTES_DOMAINES: dict[str, list[str]] = {
     "transport": ["transport", "logistique", "supply chain", "shipping", "fret",
                   "ferroviaire", "aviation"],
 }
+
+_CRITERIA_YAML = Path(__file__).resolve().parent.parent.parent / "config" / "criteria.yaml"
+
+# Cache module-level
+_synonymes_cache: tuple[dict, dict] | None = None
+
+
+def load_synonymes() -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """Charge variantes_domaines et synonymes_competences depuis criteria.yaml.
+
+    Retourne (variantes_domaines, synonymes_competences).
+    Toutes les valeurs sont passées par normaliser().
+    Fallback sur le dict en dur si le YAML est absent ou malformé.
+    """
+    global _synonymes_cache
+    if _synonymes_cache is not None:
+        return _synonymes_cache
+
+    try:
+        import yaml  # type: ignore
+        with open(_CRITERIA_YAML, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        variantes_raw = data.get("variantes_domaines") or {}
+        synonymes_raw = data.get("synonymes_competences") or {}
+
+        if not variantes_raw:
+            raise ValueError("Section variantes_domaines absente du YAML")
+
+        # Normaliser toutes les variantes
+        variantes: dict[str, list[str]] = {
+            cle: [normaliser(v) for v in valeurs]
+            for cle, valeurs in variantes_raw.items()
+        }
+
+        # Normaliser les synonymes (valeurs seulement — les clés restent telles quelles
+        # pour la lookup par nom de compétence)
+        synonymes: dict[str, list[str]] = {
+            cle: [normaliser(v) for v in valeurs]
+            for cle, valeurs in synonymes_raw.items()
+        }
+
+        _synonymes_cache = (variantes, synonymes)
+        logger.debug("Synonymes chargés depuis YAML : %d domaines, %d compétences",
+                     len(variantes), len(synonymes))
+        return _synonymes_cache
+
+    except Exception as e:
+        logger.warning("Impossible de charger les synonymes depuis YAML (%s) — fallback dict en dur", e)
+        fallback = (
+            {k: [normaliser(v) for v in vs] for k, vs in _VARIANTES_DOMAINES_FALLBACK.items()},
+            {},
+        )
+        _synonymes_cache = fallback
+        return _synonymes_cache
+
+
+# Exposés à l'import — chargés une seule fois au démarrage du module
+VARIANTES_DOMAINES, SYNONYMES_COMPETENCES = load_synonymes()
+
+
+# ---------------------------------------------------------------------------
+# Domaines
+# ---------------------------------------------------------------------------
 
 
 def _domaines_cv_normalises(domaines_cv: list[str]) -> set[str]:

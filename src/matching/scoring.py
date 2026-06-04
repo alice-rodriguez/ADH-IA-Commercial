@@ -13,6 +13,7 @@ import logging
 from typing import Optional
 
 from src.matching.utils import (
+    SYNONYMES_COMPETENCES,
     VARIANTES_DOMAINES,
     _domaines_cv_normalises,
     extraire_annees_requises,
@@ -37,11 +38,27 @@ POIDS = {
 
 
 def score_competences(competences_cv: list[str], texte_offre: str) -> int:
-    """Proportion de compétences du CV trouvées dans le texte de l'offre."""
+    """Proportion de compétences du CV trouvées dans le texte de l'offre.
+
+    Pour chaque compétence, la correspondance est vérifiée sur :
+    - la forme normalisée de la compétence elle-même
+    - + tous ses synonymes issus de SYNONYMES_COMPETENCES
+    Une compétence est matchée si AU MOINS UN des termes est présent.
+    """
     if not competences_cv or not texte_offre:
         return 0
     texte_norm = normaliser(texte_offre)
-    trouvees = sum(1 for c in competences_cv if normaliser(c) in texte_norm)
+    trouvees = 0
+    for c in competences_cv:
+        c_norm = normaliser(c)
+        # Correspondance directe
+        if c_norm in texte_norm:
+            trouvees += 1
+            continue
+        # Synonymes : lookup insensible à la casse via la clé originale
+        synonymes = SYNONYMES_COMPETENCES.get(c) or SYNONYMES_COMPETENCES.get(c.title()) or []
+        if any(s in texte_norm for s in synonymes):
+            trouvees += 1
     return round(100 * trouvees / len(competences_cv))
 
 
