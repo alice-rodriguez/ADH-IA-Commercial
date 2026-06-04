@@ -1,4 +1,5 @@
 """Génération du PDF CV adapté ADH (WeasyPrint + Jinja2 + Haiku)."""
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -58,8 +59,17 @@ def generer_pdf(cv_id: int, offre_id: int,
             f"Le CV {cv_id} n'a pas de titre_courant — profilage requis avant génération."
         )
 
-    # Reformulation par Haiku
+    # Reformulation par Haiku (lit texte_brut depuis cv)
     contenu = reformuler_avec_haiku(cv, offre)
+
+    # Secteurs dérivés des domaines du CV (pas via Haiku)
+    domaines_cv = cv.get("domaines") or []
+    if isinstance(domaines_cv, str):
+        try:
+            domaines_cv = json.loads(domaines_cv)
+        except (json.JSONDecodeError, TypeError):
+            domaines_cv = []
+    secteurs = " · ".join(domaines_cv[:5]) if domaines_cv else ""
 
     # Calcul ID consultant
     id_consultant = f"IDADH-{cv_id:03d}"
@@ -82,10 +92,10 @@ def generer_pdf(cv_id: int, offre_id: int,
         offre_contrat=offre.get("type_contrat_clarifie") or offre.get("type_contrat") or "",
         contact_email=contact_email,
         contact_telephone=contact_telephone,
-        competences_top6=contenu.get("competences_top6") or [],
+        competences_top6=contenu.get("competences_top6_ordonnees") or [],
         formations=contenu.get("formations") or [],
         certifications=contenu.get("certifications") or [],
-        secteurs=contenu.get("secteurs") or "",
+        secteurs=secteurs,
         langues=contenu.get("langues") or [],
         profil_reformule=contenu.get("profil_reformule") or "",
         experiences=contenu.get("experiences") or [],
