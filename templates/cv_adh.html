@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="{{ langue }}">
 <head>
 <meta charset="UTF-8">
 <style>
@@ -20,7 +20,6 @@
     color: #222222;
     background: #ffffff;
     width: 210mm;
-    min-height: 297mm;
   }
 
   /* ── HEADER ──────────────────────────────────────────── */
@@ -29,22 +28,22 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px;
-    min-height: 80px;
+    padding: 14px 18px;
+    min-height: 72px;
   }
 
   .header-logos {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
   }
 
   .header-logos img.picto {
-    height: 50px;
+    height: 46px;
   }
 
   .header-logos img.logo {
-    height: 36px;
+    height: 32px;
   }
 
   .header-right {
@@ -60,10 +59,10 @@
   }
 
   .header-right .titre-poste {
-    font-size: 14pt;
+    font-size: 13pt;
     font-weight: bold;
     color: #d6a9cf;
-    margin-top: 3px;
+    margin-top: 2px;
   }
 
   .header-right .badge-id {
@@ -74,14 +73,14 @@
     font-weight: bold;
     padding: 2px 10px;
     border-radius: 10px;
-    margin-top: 6px;
+    margin-top: 5px;
     letter-spacing: 0.08em;
   }
 
   /* ── BANDE BICOLORE ──────────────────────────────────── */
   .bande-bicolore {
     display: flex;
-    height: 6px;
+    height: 5px;
   }
 
   .bande-orange {
@@ -98,8 +97,8 @@
   .encart-candidature {
     background: #f5f5f5;
     border-left: 4px solid #ff914d;
-    margin: 12px 12mm 8px 12mm;
-    padding: 7px 14px;
+    margin: 10px 12mm 8px 12mm;
+    padding: 6px 12px;
   }
 
   .encart-candidature .label {
@@ -123,22 +122,21 @@
     margin-top: 2px;
   }
 
-  /* ── CORPS 2 COLONNES ────────────────────────────────── */
+  /* ── CORPS 2 COLONNES (table) ────────────────────────── */
   .corps {
-    display: flex;
-    margin: 0 12mm 32mm 12mm;
-    gap: 14px;
-    align-items: flex-start;
+    width: 186mm;
+    margin: 8px 12mm 10mm 12mm;
+    border-collapse: collapse;
+    table-layout: fixed;
   }
 
   /* ── COLONNE GAUCHE ──────────────────────────────────── */
   .col-gauche {
     width: 70mm;
-    flex-shrink: 0;
     background: #fafafa;
-    border-radius: 4px;
-    padding: 12px 10px;
     border: 1px solid #eeeeee;
+    padding: 10px 10px;
+    vertical-align: top;
   }
 
   .section-titre {
@@ -149,8 +147,9 @@
     color: #000000;
     border-bottom: 2px solid #ff914d;
     padding-bottom: 3px;
-    margin-bottom: 7px;
-    margin-top: 12px;
+    margin-bottom: 6px;
+    margin-top: 11px;
+    page-break-after: avoid;
   }
 
   .col-gauche .section-titre:first-child {
@@ -176,7 +175,7 @@
     display: inline-block;
     font-size: 8pt;
     font-weight: bold;
-    padding: 3px 8px;
+    padding: 3px 7px;
     border-radius: 10px;
     margin: 2px 2px 2px 0;
   }
@@ -203,7 +202,7 @@
     color: #444444;
     padding-left: 12px;
     position: relative;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
     line-height: 1.35;
   }
 
@@ -233,8 +232,8 @@
 
   /* ── COLONNE DROITE ──────────────────────────────────── */
   .col-droite {
-    flex: 1;
-    min-width: 0;
+    padding-left: 14px;
+    vertical-align: top;
   }
 
   .section-droite-titre {
@@ -245,8 +244,9 @@
     color: #000000;
     border-bottom: 2px solid #d6a9cf;
     padding-bottom: 3px;
-    margin-bottom: 8px;
-    margin-top: 12px;
+    margin-bottom: 7px;
+    margin-top: 11px;
+    page-break-after: avoid;
   }
 
   .col-droite .section-droite-titre:first-child {
@@ -261,9 +261,10 @@
   }
 
   .experience-item {
-    margin-bottom: 10px;
-    padding-bottom: 10px;
+    margin-bottom: 9px;
+    padding-bottom: 9px;
     border-bottom: 1px solid #f0f0f0;
+    page-break-inside: avoid;
   }
 
   .experience-item:last-child {
@@ -272,24 +273,21 @@
   }
 
   .exp-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 8px;
     margin-bottom: 2px;
-  }
-
-  .exp-intitule {
-    font-size: 11pt;
-    font-weight: bold;
-    flex: 1;
   }
 
   .exp-dates {
     font-size: 9pt;
     color: #888888;
-    white-space: nowrap;
-    flex-shrink: 0;
+    float: right;
+    margin-left: 8px;
+  }
+
+  .exp-intitule {
+    font-size: 11pt;
+    font-weight: bold;
+    display: block;
+    overflow: hidden;
   }
 
   .exp-entreprise {
@@ -297,22 +295,13 @@
     font-style: italic;
     color: #666666;
     margin-bottom: 4px;
+    clear: both;
   }
 
   .exp-desc {
     font-size: 9pt;
     color: #444444;
     line-height: 1.45;
-  }
-
-  /* ── FOOTER ──────────────────────────────────────────── */
-  .footer {
-    background: #000000;
-    height: 20mm;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
   }
 </style>
 </head>
@@ -339,7 +328,7 @@
 
 <!-- ENCART CANDIDATURE -->
 <div class="encart-candidature">
-  <div class="label">Candidature pour</div>
+  <div class="label">{{ labels.candidature_pour }}</div>
   <div class="offre-titre">{{ offre_titre }}</div>
   {% if offre_entreprise or offre_lieu or offre_contrat %}
   <div class="offre-meta">
@@ -351,96 +340,96 @@
 </div>
 
 <!-- CORPS 2 COLONNES -->
-<div class="corps">
+<table class="corps">
+  <tr>
 
-  <!-- COLONNE GAUCHE -->
-  <div class="col-gauche">
+    <!-- COLONNE GAUCHE -->
+    <td class="col-gauche">
 
-    <div class="section-titre">Contact</div>
-    <div class="contact-item">
-      <strong>Email</strong>
-      {{ contact_email }}
-    </div>
-    <div class="contact-item">
-      <strong>Téléphone</strong>
-      {{ contact_telephone }}
-    </div>
-
-    <div class="section-titre">Compétences clés</div>
-    <div>
-      {% for comp in competences_top6[:3] %}
-      <span class="comp-badge comp-orange">{{ comp }}</span>
-      {% endfor %}
-      {% for comp in competences_top6[3:6] %}
-      <span class="comp-badge comp-violet">{{ comp }}</span>
-      {% endfor %}
-    </div>
-
-    {% if formations %}
-    <div class="section-titre">Formation</div>
-    <ul class="liste-puce">
-      {% for f in formations %}
-      <li>{{ f }}</li>
-      {% endfor %}
-    </ul>
-    {% endif %}
-
-    {% if certifications %}
-    <div class="section-titre">Certifications</div>
-    <ul class="liste-puce">
-      {% for c in certifications %}
-      <li>{{ c }}</li>
-      {% endfor %}
-    </ul>
-    {% endif %}
-
-    {% if secteurs %}
-    <div class="section-titre">Secteurs</div>
-    <div class="secteurs-text">{{ secteurs }}</div>
-    {% endif %}
-
-    {% if langues %}
-    <div class="section-titre">Langues</div>
-    {% for l in langues %}
-    <div class="langue-item">
-      {{ l.nom }} <span class="langue-niveau">— {{ l.niveau }}</span>
-    </div>
-    {% endfor %}
-    {% endif %}
-
-  </div>
-
-  <!-- COLONNE DROITE -->
-  <div class="col-droite">
-
-    <div class="section-droite-titre">Profil</div>
-    <div class="profil-texte">{{ profil_reformule }}</div>
-
-    {% if experiences %}
-    <div class="section-droite-titre">Expériences</div>
-    {% for exp in experiences %}
-    <div class="experience-item">
-      <div class="exp-header">
-        <div class="exp-intitule" style="color: {{ '#ff914d' if exp.a_mettre_en_avant else '#000000' }}">{{ exp.intitule }}</div>
-        <div class="exp-dates">{{ exp.dates }}</div>
+      <div class="section-titre">{{ labels.contact }}</div>
+      <div class="contact-item">
+        <strong>{{ labels.email }}</strong>
+        {{ contact_email }}
       </div>
-      <div class="exp-entreprise">{{ exp.entreprise }}</div>
-      <div class="exp-desc">{{ exp.description }}</div>
-    </div>
-    {% endfor %}
-    {% endif %}
+      <div class="contact-item">
+        <strong>{{ labels.telephone }}</strong>
+        {{ contact_telephone }}
+      </div>
 
-    {% if annees_experience %}
-    <p style="font-size:9pt; color:#888; margin-top:10px; font-style:italic;">
-      {{ annees_experience }} ans d'expérience
-    </p>
-    {% endif %}
+      <div class="section-titre">{{ labels.competences_cles }}</div>
+      <div>
+        {% for comp in competences_top6[:3] %}
+        <span class="comp-badge comp-orange">{{ comp }}</span>
+        {% endfor %}
+        {% for comp in competences_top6[3:6] %}
+        <span class="comp-badge comp-violet">{{ comp }}</span>
+        {% endfor %}
+      </div>
 
-  </div>
-</div>
+      {% if formations %}
+      <div class="section-titre">{{ labels.formation }}</div>
+      <ul class="liste-puce">
+        {% for f in formations %}
+        <li>{{ f }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
 
-<!-- FOOTER -->
-<div class="footer"></div>
+      {% if certifications %}
+      <div class="section-titre">{{ labels.certifications }}</div>
+      <ul class="liste-puce">
+        {% for c in certifications %}
+        <li>{{ c }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if secteurs %}
+      <div class="section-titre">{{ labels.secteurs }}</div>
+      <div class="secteurs-text">{{ secteurs }}</div>
+      {% endif %}
+
+      {% if langues %}
+      <div class="section-titre">{{ labels.langues }}</div>
+      {% for l in langues %}
+      <div class="langue-item">
+        {{ l.nom }} <span class="langue-niveau">— {{ l.niveau }}</span>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+    </td>
+
+    <!-- COLONNE DROITE -->
+    <td class="col-droite">
+
+      <div class="section-droite-titre">{{ labels.profil }}</div>
+      <div class="profil-texte">{{ profil_reformule }}</div>
+
+      {% if experiences %}
+      <div class="section-droite-titre">{{ labels.experiences }}</div>
+      {% for exp in experiences %}
+      <div class="experience-item">
+        <div class="exp-header">
+          <span class="exp-dates">{{ exp.dates }}</span>
+          <span class="exp-intitule" style="color: {{ '#ff914d' if exp.a_mettre_en_avant else '#000000' }}">{{ exp.intitule }}</span>
+        </div>
+        <div class="exp-entreprise">{{ exp.entreprise }}</div>
+        <div class="exp-desc">{{ exp.description }}</div>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if annees_exp_label %}
+      <p style="font-size:9pt; color:#888; margin-top:10px; font-style:italic;">
+        {{ annees_exp_label }}
+      </p>
+      {% endif %}
+
+    </td>
+
+  </tr>
+</table>
 
 </body>
 </html>

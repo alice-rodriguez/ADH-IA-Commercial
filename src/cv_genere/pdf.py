@@ -8,6 +8,7 @@ from jinja2 import Environment, FileSystemLoader
 from weasyprint import HTML
 
 from api.database import get_cv_par_id, get_offre_par_id
+from src.cv_genere.langue import detecter_langue_cv, get_labels
 from src.cv_genere.reformulation import reformuler_avec_haiku
 from src.storage.database import _connexion
 
@@ -59,8 +60,12 @@ def generer_pdf(cv_id: int, offre_id: int,
             f"Le CV {cv_id} n'a pas de titre_courant — profilage requis avant génération."
         )
 
-    # Reformulation par Haiku (lit texte_brut depuis cv)
-    contenu = reformuler_avec_haiku(cv, offre)
+    # Détection de la langue du CV brut
+    langue = detecter_langue_cv(cv.get("texte_brut") or "")
+    labels = get_labels(langue)
+
+    # Reformulation par Haiku dans la langue détectée
+    contenu = reformuler_avec_haiku(cv, offre, langue=langue)
 
     # Secteurs dérivés des domaines du CV (pas via Haiku)
     domaines_cv = cv.get("domaines") or []
@@ -70,6 +75,12 @@ def generer_pdf(cv_id: int, offre_id: int,
         except (json.JSONDecodeError, TypeError):
             domaines_cv = []
     secteurs = " · ".join(domaines_cv[:5]) if domaines_cv else ""
+
+    # Label "X ans d'expérience" formaté
+    annees_experience = cv.get("annees_experience")
+    annees_exp_label = None
+    if annees_experience is not None:
+        annees_exp_label = labels["annees_experience"].replace("{n}", str(annees_experience))
 
     # Calcul ID consultant
     id_consultant = f"IDADH-{cv_id:03d}"
@@ -85,7 +96,7 @@ def generer_pdf(cv_id: int, offre_id: int,
     html_str = template.render(
         id_consultant=id_consultant,
         titre_consultant=cv.get("titre_courant", "Consultant IT"),
-        annees_experience=cv.get("annees_experience"),
+        annees_exp_label=annees_exp_label,
         offre_titre=offre.get("titre", ""),
         offre_entreprise=offre.get("entreprise") or "",
         offre_lieu=offre.get("lieu") or "",
@@ -101,6 +112,8 @@ def generer_pdf(cv_id: int, offre_id: int,
         experiences=contenu.get("experiences") or [],
         picto_path=picto_path.as_uri(),
         logo_path=logo_path.as_uri(),
+        labels=labels,
+        langue=langue,
     )
 
     # Génération PDF

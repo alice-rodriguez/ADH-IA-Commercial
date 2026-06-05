@@ -51,6 +51,9 @@ INTERDICTION ABSOLUE D'INVENTER DES EXPÉRIENCES OU ENTREPRISES.
 Toute expérience que tu retournes DOIT être présente dans le texte brut ci-dessus.
 Si tu ne trouves pas une expérience dans le texte brut, ne l'ajoute pas. JAMAIS D'INVENTION.
 
+LANGUE DE RÉDACTION :
+{langue_instruction}
+
 Retourne UNIQUEMENT ce JSON (aucun texte avant ou après) :
 {{
   "profil_reformule": "4-5 lignes adaptées à l'offre cible.",
@@ -76,6 +79,11 @@ Retourne UNIQUEMENT ce JSON (aucun texte avant ou après) :
   "langues": [{{"nom": "Français", "niveau": "Natif"}}, {{"nom": "Anglais", "niveau": "Professional"}}]
 }}"""
 
+_LANGUE_INSTRUCTION = {
+    "fr": "Tu DOIS rédiger le champ 'profil_reformule' et toutes les 'description' d'expériences en FRANÇAIS.",
+    "en": "You MUST write the 'profil_reformule' field and all experience 'description' fields in ENGLISH.",
+}
+
 
 def _strip_fences(text: str) -> str:
     text = text.strip()
@@ -89,10 +97,16 @@ def _strip_fences(text: str) -> str:
     return text
 
 
-def reformuler_avec_haiku(cv_data: dict, offre_data: dict) -> dict:
+def reformuler_avec_haiku(cv_data: dict, offre_data: dict, langue: str = "fr") -> dict:
     """Reformule le contenu du CV pour le cibler sur une offre.
 
     Lit cv_data["texte_brut"] comme source de vérité pour les expériences.
+    Génère le profil et les descriptions dans la langue spécifiée.
+
+    Args:
+        cv_data: dict du CV (doit contenir texte_brut).
+        offre_data: dict de l'offre cible.
+        langue: "fr" ou "en" — langue de rédaction du profil et des descriptions.
 
     Returns:
         dict avec profil_reformule, competences_top6_ordonnees, experiences,
@@ -120,6 +134,7 @@ def reformuler_avec_haiku(cv_data: dict, offre_data: dict) -> dict:
             domaines = [d.strip() for d in domaines.split(",") if d.strip()]
 
     texte_brut = (cv_data.get("texte_brut") or "").strip()
+    langue_instruction = _LANGUE_INSTRUCTION.get(langue, _LANGUE_INSTRUCTION["fr"])
 
     prompt = PROMPT_UTILISATEUR.format(
         texte_brut=texte_brut[:8000] if texte_brut else "(texte brut non disponible)",
@@ -130,6 +145,7 @@ def reformuler_avec_haiku(cv_data: dict, offre_data: dict) -> dict:
         offre_titre=offre_data.get("titre") or "",
         offre_entreprise=offre_data.get("entreprise") or "Non précisé",
         offre_description=(offre_data.get("description") or "")[:2000],
+        langue_instruction=langue_instruction,
     )
 
     client = Anthropic(api_key=api_key)
