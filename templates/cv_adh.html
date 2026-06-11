@@ -268,7 +268,14 @@
     margin-bottom: 9px;
     padding-bottom: 9px;
     border-bottom: 1px solid #f0f0f0;
-    page-break-inside: avoid;
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
+  .exp-header,
+  .exp-entreprise {
+    page-break-after: avoid;
+    break-after: avoid;
   }
 
   .experience-item:last-child {
