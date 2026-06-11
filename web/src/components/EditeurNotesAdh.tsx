@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CV, NotesAdhUpdate } from '../api'
-import { patchNotesAdh } from '../api'
+import { getLangueCV, patchNotesAdh } from '../api'
 
 type StatutRelation = 'actif' | 'en_pause' | 'place' | 'inactif'
 
@@ -35,8 +35,13 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onV
   const [date_dernier_contact, setDateDernierContact] = useState(cv.date_dernier_contact ?? '')
   const [profil_adh, setProfilAdh] = useState(cv.profil_adh ?? '')
   const [notes_experiences, setNotesExperiences] = useState(cv.notes_experiences ?? '')
+  const [langueCV, setLangueCV] = useState<'fr' | 'en' | null>(null)
   const [saving, setSaving] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    getLangueCV(cv.id).then(setLangueCV).catch((e) => console.error('Langue CV:', e))
+  }, [cv.id])
 
   async function handleSauvegarder() {
     const payload: NotesAdhUpdate = {}
@@ -223,11 +228,16 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onV
         <label className="block text-xs font-semibold text-gray-600 mb-1">
           Profil personnalisé (CV adapté)
         </label>
+        {langueCV && (
+          <div className="text-xs text-gray-500 mb-2">
+            Langue détectée du CV : {langueCV === 'fr' ? '🇫🇷 Français' : '🇬🇧 Anglais'}
+          </div>
+        )}
         <textarea
           rows={4}
           value={profil_adh}
           onChange={(e) => setProfilAdh(e.target.value)}
-          placeholder="Profil personnalisé (optionnel) — sinon le profil du CV original sera utilisé"
+          placeholder="Profil personnalisé — à rédiger dans la langue du CV cible. Sinon le profil du CV original sera utilisé."
           className={`${INPUT_CLASS} resize-none`}
         />
       </div>

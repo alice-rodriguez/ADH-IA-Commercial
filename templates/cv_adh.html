@@ -5,7 +5,7 @@
 <style>
   @page {
     size: A4 portrait;
-    margin: 0;
+    margin: 12mm 0 12mm 0;
   }
 
   * {
@@ -22,7 +22,11 @@
     width: 210mm;
   }
 
-  /* ── HEADER ──────────────────────────────────────────── */
+  /* ── HEADER (full-bleed page 1 via compensation -12mm) ── */
+  .first-page-banner {
+    margin-top: -12mm;
+  }
+
   .header {
     background: #000000;
     display: flex;
@@ -125,7 +129,7 @@
   /* ── CORPS 2 COLONNES (table) ────────────────────────── */
   .corps {
     width: 186mm;
-    margin: 8px 12mm 10mm 12mm;
+    margin: 8px 12mm 4mm 12mm;
     border-collapse: collapse;
     table-layout: fixed;
   }
@@ -273,21 +277,24 @@
   }
 
   .exp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
     margin-bottom: 2px;
-  }
-
-  .exp-dates {
-    font-size: 9pt;
-    color: #888888;
-    float: right;
-    margin-left: 8px;
   }
 
   .exp-intitule {
     font-size: 11pt;
     font-weight: bold;
-    display: block;
-    overflow: hidden;
+    flex: 1;
+  }
+
+  .exp-dates {
+    font-size: 9pt;
+    color: #888888;
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 
   .exp-entreprise {
@@ -295,15 +302,44 @@
     font-style: italic;
     color: #666666;
     margin-bottom: 4px;
-    clear: both;
   }
 
-  .exp-desc {
+  /* ── BULLETS DESCRIPTION D'EXPÉRIENCE ────────────────── */
+  .exp-bullets {
+    list-style: none;
+    padding: 0;
+    margin: 4px 0 0 0;
+  }
+
+  .exp-bullets li {
     font-size: 9pt;
     color: #444444;
-    line-height: 1.45;
+    padding-left: 12px;
+    position: relative;
+    margin-bottom: 3px;
+    line-height: 1.4;
   }
 
+  .exp-bullets li::before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: #ff914d;
+  }
+
+  .exp-bullets .exp-bullet-titre {
+    font-weight: bold;
+    color: #ff914d;
+    padding-left: 0;
+    margin-top: 6px;
+    margin-bottom: 3px;
+  }
+
+  .exp-bullets .exp-bullet-titre::before {
+    content: "";
+  }
+
+  /* ── POSTES (regroupement Earlier Career) ────────────── */
   .exp-postes {
     list-style: none;
     padding: 0;
@@ -360,23 +396,24 @@
 </head>
 <body>
 
-<!-- HEADER -->
-<div class="header">
-  <div class="header-logos">
-    <img class="picto" src="{{ picto_path }}" alt="ADH">
-    <img class="logo" src="{{ logo_path }}" alt="ADH PM Consulting">
+<!-- HEADER PAGE 1 (full-bleed via margin-top: -12mm) -->
+<div class="first-page-banner">
+  <div class="header">
+    <div class="header-logos">
+      <img class="picto" src="{{ picto_path }}" alt="ADH">
+      <img class="logo" src="{{ logo_path }}" alt="ADH PM Consulting">
+    </div>
+    <div class="header-right">
+      <div class="label-consultant">Consultant ADH</div>
+      <div class="titre-poste">{{ titre_consultant }}</div>
+      <div class="badge-id">{{ id_consultant }}</div>
+    </div>
   </div>
-  <div class="header-right">
-    <div class="label-consultant">Consultant ADH</div>
-    <div class="titre-poste">{{ titre_consultant }}</div>
-    <div class="badge-id">{{ id_consultant }}</div>
-  </div>
-</div>
 
-<!-- BANDE BICOLORE -->
-<div class="bande-bicolore">
-  <div class="bande-orange"></div>
-  <div class="bande-violet"></div>
+  <div class="bande-bicolore">
+    <div class="bande-orange"></div>
+    <div class="bande-violet"></div>
+  </div>
 </div>
 
 <!-- ENCART CANDIDATURE -->
@@ -475,8 +512,8 @@
       {% for exp in experiences %}
       <div class="experience-item">
         <div class="exp-header">
-          <span class="exp-dates">{{ exp.dates }}</span>
-          <span class="exp-intitule" style="color: {{ '#ff914d' if exp.a_mettre_en_avant else '#000000' }}">{{ exp.intitule }}</span>
+          <div class="exp-intitule" style="color: {{ '#ff914d' if exp.a_mettre_en_avant else '#000000' }}">{{ exp.intitule }}</div>
+          <div class="exp-dates">{{ exp.dates }}</div>
         </div>
         <div class="exp-entreprise">{{ exp.entreprise }}</div>
         {% if exp.postes %}
@@ -485,8 +522,17 @@
           <li>{{ poste }}</li>
           {% endfor %}
         </ul>
-        {% elif exp.description %}
-        <div class="exp-desc">{{ exp.description }}</div>
+        {% elif exp.description_bullets %}
+        <ul class="exp-bullets">
+          {% for bullet in exp.description_bullets %}
+            {% set b = bullet|trim %}
+            {% if b.startswith('**') and b.endswith('**') %}
+              <li class="exp-bullet-titre">{{ b[2:-2]|trim }}</li>
+            {% else %}
+              <li>{{ b }}</li>
+            {% endif %}
+          {% endfor %}
+        </ul>
         {% endif %}
       </div>
       {% endfor %}

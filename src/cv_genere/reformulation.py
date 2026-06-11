@@ -26,8 +26,12 @@ RÈGLES ABSOLUES ANTI-HALLUCINATION :
 
 3. INTERDICTION ABSOLUE d'inventer une description.
    Si une expérience n'a pas de description dans le CV brut (juste un intitulé),
-   laisse "description": null. N'utilise que les notes_experiences fournies par l'utilisateur
-   ou le CV brut comme source de contenu."""
+   laisse "description_bullets": null. N'utilise que les notes_experiences fournies
+   par l'utilisateur ou le CV brut comme source de contenu.
+
+4. INTERDICTION ABSOLUE d'omettre un sous-projet présent dans le CV brut ou les notes_experiences.
+   Si une expérience contient plusieurs sous-projets distincts (titres intermédiaires, paragraphes
+   séparés), tu DOIS TOUS les préserver dans description_bullets avec un en-tête **Sous-projet**."""
 
 PROMPT_UTILISATEUR = """Tu dois produire un CV anonymisé et ciblé pour un cabinet de conseil en recrutement.
 
@@ -62,17 +66,61 @@ INSTRUCTIONS :
 
 4. COMPÉTENCES : sélectionne et ordonne les 6 compétences les plus pertinentes pour l'offre parmi celles du CV.
 
-5. EXPÉRIENCES : extrais TOUTES les expériences du texte brut.
-   - REGROUPEMENTS : si une section regroupe plusieurs postes sous une même entête de dates
-     (ex: EARLIER CAREER 2013-2018, ANTERIORITÉ, etc.), tu DOIS la rendre comme UNE SEULE expérience
-     avec un champ "postes" contenant la liste des intitulés. NE PAS séparer en plusieurs expériences.
-   - EXPÉRIENCES INDIVIDUELLES : pour chaque expérience normale, "postes" est null.
-   - Marque 2 ou 3 expériences maximum avec "a_mettre_en_avant": true (les plus pertinentes pour cette offre).
-   - Toutes les autres ont "a_mettre_en_avant": false.
-   - Description : copie ou paraphrase fidèle du CV brut. Si pas de description disponible,
-     mets "description": null. NE PAS INVENTER.
+5. EXPÉRIENCES À METTRE EN AVANT :
+   Tu DOIS marquer entre 2 et 3 expériences avec "a_mettre_en_avant": true. PAS MOINS DE 2.
+   Choisis celles dont l'intitulé ou la description contient des mots-clés directement liés à l'offre cible.
+   Exemple pour une offre TRADING : marque les expériences contenant 'Trade', 'Finance', 'Trading',
+   'DOKA', 'Banking', 'Capital Markets' dans l'intitulé ou la description.
+   Si AUCUNE expérience ne semble parfaitement pertinente, marque quand même les 2 plus récentes
+   ou les 2 ayant le plus de mots-clés communs avec l'offre.
 
-6. FORMATIONS, CERTIFICATIONS, LANGUES : copie-les fidèlement depuis le texte brut, sans omission.
+6. REGROUPEMENT EARLIER CAREER :
+   Si le CV brut contient une section regroupée (ex: 'EARLIER CAREER 2013-2018') avec plusieurs intitulés,
+   et que notes_experiences contient les DÉTAILS d'au moins UNE de ces missions, alors :
+   - Les missions DÉTAILLÉES dans notes_experiences sont remontées comme expériences INDIVIDUELLES
+     (avec leur vraie période, leurs description_bullets).
+   - Les missions NON DÉTAILLÉES (juste intitulées dans le CV brut, sans notes) restent regroupées
+     dans UN bloc Earlier Career résiduel avec :
+     * la période RÉSIDUELLE (recalculée selon les missions restantes — pas la période totale du bloc)
+     * "postes": liste des intitulés restants
+     * "description_bullets": null
+   - Si TOUTES les missions du bloc ont été détaillées, NE PAS produire de bloc Earlier Career résiduel.
+   - NE JAMAIS afficher la même mission DEUX FOIS (une fois en expérience individuelle ET dans Earlier Career).
+
+7. FORMAT DES DESCRIPTIONS :
+   Tu DOIS retourner les descriptions sous forme de "description_bullets" (liste de strings courts),
+   JAMAIS sous forme de paragraphe long.
+   Chaque bullet :
+   - Commence par un VERBE D'ACTION (Led, Coordinated, Managed, Defined, Drove, Implemented, etc.).
+   - Fait 10-25 mots maximum.
+   - Représente UNE action ou responsabilité distincte.
+   Si la source (CV brut ou notes_experiences) contient déjà des bullets, conserve leur structure
+   (un bullet source = un bullet output). Si la source contient un paragraphe dense, découpe-le en
+   3-6 bullets logiques.
+
+8. SOUS-PROJETS DANS UNE EXPÉRIENCE :
+   Si une expérience contient PLUSIEURS sous-projets dans la source (CV brut ou notes_experiences),
+   séparés par des titres intermédiaires ou des paragraphes distincts (ex: 'SAB AT migration' puis
+   'DOKA-NG Trade Finance'), tu DOIS PRÉSERVER ces sous-blocs distinctement.
+   Chaque sous-projet commence par un bullet titre au format markdown **Nom du sous-projet**.
+   NE JAMAIS fusionner deux sous-projets. NE JAMAIS omettre un sous-projet.
+
+   Exemple — si les notes_experiences disent :
+     "SAB AT migration: bullet1, bullet2, bullet3
+      DOKA-NG implementation: bullet4, bullet5, bullet6"
+   Tu DOIS retourner :
+     "description_bullets": [
+       "**SAB AT Migration**",
+       "bullet1",
+       "bullet2",
+       "bullet3",
+       "**DOKA-NG Trade Finance Implementation**",
+       "bullet4",
+       "bullet5",
+       "bullet6"
+     ]
+
+9. FORMATIONS, CERTIFICATIONS, LANGUES : copie-les fidèlement depuis le texte brut, sans omission.
 
 LANGUE DE RÉDACTION :
 {langue_instruction}
@@ -92,16 +140,24 @@ Retourne UNIQUEMENT ce JSON (aucun texte avant ou après) :
       "intitule": "Titre exact du poste",
       "entreprise": "Nom réel de l'entreprise",
       "dates": "Mois AAAA – Mois AAAA",
-      "description": "Description fidèle ou null si absente",
+      "description_bullets": ["Bullet 1", "Bullet 2", "Bullet 3"],
       "postes": null,
       "a_mettre_en_avant": true
     }},
     {{
-      "intitule": "EARLIER CAREER (ou titre du regroupement)",
+      "intitule": "Titre du poste",
+      "entreprise": "Entreprise",
+      "dates": "AAAA – AAAA",
+      "description_bullets": ["**SAB AT Migration**", "Bullet 1", "Bullet 2", "**DOKA-NG Trade Finance**", "Bullet 3", "Bullet 4"],
+      "postes": null,
+      "a_mettre_en_avant": true
+    }},
+    {{
+      "intitule": "Earlier Career (ou titre du regroupement)",
       "entreprise": "Entreprises diverses ou nom commun",
       "dates": "AAAA – AAAA",
-      "description": null,
-      "postes": ["Poste 1 — Entreprise", "Poste 2 — Entreprise", "Poste 3 — Entreprise"],
+      "description_bullets": null,
+      "postes": ["Poste 1 — Entreprise", "Poste 2 — Entreprise"],
       "a_mettre_en_avant": false
     }}
   ],
@@ -111,8 +167,8 @@ Retourne UNIQUEMENT ce JSON (aucun texte avant ou après) :
 }}"""
 
 _LANGUE_INSTRUCTION = {
-    "fr": "Tu DOIS rédiger les champs 'profil' (si généré), 'key_value_bullets' et toutes les 'description' d'expériences en FRANÇAIS.",
-    "en": "You MUST write the 'profil' field (if generated), 'key_value_bullets' and all experience 'description' fields in ENGLISH.",
+    "fr": "Tu DOIS rédiger les champs 'profil' (si généré), 'key_value_bullets' et tous les 'description_bullets' d'expériences en FRANÇAIS.",
+    "en": "You MUST write the 'profil' field (if generated), 'key_value_bullets' and all experience 'description_bullets' in ENGLISH.",
 }
 
 _INSTRUCTION_PROFIL_AVEC_ADH = (
@@ -147,7 +203,8 @@ def reformuler_avec_haiku(cv_data: dict, offre_data: dict, langue: str = "fr") -
     Lit cv_data["texte_brut"] comme source de vérité pour les expériences.
     Si cv_data["profil_adh"] est fourni, Haiku ne génère pas de profil.
     Si cv_data["notes_experiences"] est fourni, Haiku peut s'en servir
-    pour enrichir descriptions et key_value_bullets.
+    pour enrichir descriptions et key_value_bullets, et remonter des
+    missions détaillées hors d'un bloc Earlier Career.
 
     Args:
         cv_data: dict du CV (doit contenir texte_brut).
@@ -156,7 +213,8 @@ def reformuler_avec_haiku(cv_data: dict, offre_data: dict, langue: str = "fr") -
 
     Returns:
         dict avec profil, key_value_bullets, competences_top6_ordonnees,
-        experiences, formations, certifications, langues.
+        experiences (chacune avec description_bullets + postes optionnels),
+        formations, certifications, langues.
 
     Raises:
         RuntimeError si l'API ou le parsing échoue.
@@ -246,5 +304,11 @@ def reformuler_avec_haiku(cv_data: dict, offre_data: dict, langue: str = "fr") -
     data.setdefault("formations", [])
     data.setdefault("certifications", [])
     data.setdefault("langues", [{"nom": "Français", "niveau": "Natif"}])
+
+    # Normaliser les expériences : garantir description_bullets et postes
+    for exp in data.get("experiences", []):
+        exp.setdefault("description_bullets", None)
+        exp.setdefault("postes", None)
+        exp.setdefault("a_mettre_en_avant", False)
 
     return data

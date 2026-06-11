@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from src.auth.sessions import creer_session, supprimer_session, valider_session
+from src.cv_genere.langue import detecter_langue_cv
 from src.cv_genere.pdf import generer_pdf
 from src.auth.users import (
     creer_user, get_user_par_id, get_user_par_username,
@@ -454,6 +455,15 @@ def detail_cv(cv_id: int):
         raise
     except Exception as e:
         raise HTTPException(500, f"Erreur base de données : {e}")
+
+
+@app.get("/api/cvs/{cv_id}/langue")
+def langue_cv(cv_id: int):
+    """Retourne la langue détectée ('fr' ou 'en') pour le texte brut du CV."""
+    cv = get_cv_par_id(cv_id)
+    if cv is None:
+        raise HTTPException(404, f"CV {cv_id} non trouvé")
+    return {"langue": detecter_langue_cv(cv.get("texte_brut") or "")}
 
 
 # ── Analyses IA ──────────────────────────────────────────────────────────────

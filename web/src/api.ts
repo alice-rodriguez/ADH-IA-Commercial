@@ -140,6 +140,13 @@ export async function fetchCVParId(cvId: number): Promise<CV> {
   return r.json()
 }
 
+export async function getLangueCV(cvId: number): Promise<'fr' | 'en'> {
+  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}/langue`, { credentials: 'include' })
+  if (!r.ok) throw new Error(`Erreur GET /api/cvs/${cvId}/langue : ${r.status}`)
+  const data = await r.json()
+  return data.langue === 'en' ? 'en' : 'fr'
+}
+
 export async function patchNotesAdh(cvId: number, notes: NotesAdhUpdate): Promise<CV> {
   const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}/notes-adh`, {
     method: 'PATCH',
