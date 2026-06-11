@@ -67,6 +67,21 @@ def generer_pdf(cv_id: int, offre_id: int,
     # Reformulation par Haiku dans la langue détectée
     contenu = reformuler_avec_haiku(cv, offre, langue=langue)
 
+    # Cascade profil : Notes ADH > Haiku
+    profil_final = (cv.get("profil_adh") or "").strip()
+    if not profil_final:
+        profil_final = (contenu.get("profil") or "").strip()
+
+    # Titre KEY VALUE (calculé en Python, pas par Haiku)
+    entreprise = (offre.get("entreprise") or "").strip()
+    if entreprise:
+        if langue == "fr":
+            titre_key_value = f"POINTS FORTS POUR {entreprise.upper()}"
+        else:
+            titre_key_value = f"KEY VALUE FOR {entreprise.upper()}"
+    else:
+        titre_key_value = "POINTS FORTS" if langue == "fr" else "KEY VALUE PROPOSITION"
+
     # Secteurs dérivés des domaines du CV (pas via Haiku)
     domaines_cv = cv.get("domaines") or []
     if isinstance(domaines_cv, str):
@@ -108,7 +123,9 @@ def generer_pdf(cv_id: int, offre_id: int,
         certifications=contenu.get("certifications") or [],
         secteurs=secteurs,
         langues=contenu.get("langues") or [],
-        profil_reformule=contenu.get("profil_reformule") or "",
+        profil_final=profil_final,
+        key_value_bullets=contenu.get("key_value_bullets") or [],
+        titre_key_value=titre_key_value,
         experiences=contenu.get("experiences") or [],
         picto_path=picto_path.as_uri(),
         logo_path=logo_path.as_uri(),

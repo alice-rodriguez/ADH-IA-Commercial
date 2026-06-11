@@ -59,6 +59,8 @@ class CV(BaseModel):
     statut_relation: Optional[str] = None
     date_dernier_contact: Optional[str] = None
     date_modif_notes_adh: Optional[str] = None
+    profil_adh: Optional[str] = None
+    notes_experiences: Optional[str] = None
 
 
 class NotesAdhUpdate(BaseModel):
@@ -72,6 +74,8 @@ class NotesAdhUpdate(BaseModel):
     commentaires_adh: Optional[str] = None
     statut_relation: Optional[Literal['actif', 'en_pause', 'place', 'inactif']] = None
     date_dernier_contact: Optional[str] = None
+    profil_adh: Optional[str] = None
+    notes_experiences: Optional[str] = None
 
 
 class Offre(BaseModel):

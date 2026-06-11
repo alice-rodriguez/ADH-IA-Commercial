@@ -111,6 +111,8 @@ export interface CV {
   statut_relation: string | null
   date_dernier_contact: string | null
   date_modif_notes_adh: string | null
+  profil_adh: string | null
+  notes_experiences: string | null
 }
 
 export interface NotesAdhUpdate {
@@ -122,6 +124,8 @@ export interface NotesAdhUpdate {
   commentaires_adh?: string | null
   statut_relation?: 'actif' | 'en_pause' | 'place' | 'inactif'
   date_dernier_contact?: string | null
+  profil_adh?: string | null
+  notes_experiences?: string | null
 }
 
 export async function fetchCVs(): Promise<CV[]> {

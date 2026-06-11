@@ -33,6 +33,8 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onV
     (cv.statut_relation as StatutRelation) ?? 'actif',
   )
   const [date_dernier_contact, setDateDernierContact] = useState(cv.date_dernier_contact ?? '')
+  const [profil_adh, setProfilAdh] = useState(cv.profil_adh ?? '')
+  const [notes_experiences, setNotesExperiences] = useState(cv.notes_experiences ?? '')
   const [saving, setSaving] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
 
@@ -64,6 +66,14 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onV
     const initDate = cv.date_dernier_contact ?? ''
     if (date_dernier_contact !== initDate)
       payload.date_dernier_contact = date_dernier_contact === '' ? null : date_dernier_contact
+
+    const initProfilAdh = cv.profil_adh ?? ''
+    if (profil_adh !== initProfilAdh)
+      payload.profil_adh = profil_adh === '' ? null : profil_adh
+
+    const initNotesExp = cv.notes_experiences ?? ''
+    if (notes_experiences !== initNotesExp)
+      payload.notes_experiences = notes_experiences === '' ? null : notes_experiences
 
     if (Object.keys(payload).length === 0) {
       alert('Aucune modification')
@@ -197,13 +207,41 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onV
       </div>
 
       {/* Commentaires pleine largeur */}
-      <div className="mb-5">
+      <div className="mb-4">
         <label className="block text-xs font-semibold text-gray-600 mb-1">Commentaires ADH</label>
         <textarea
           rows={5}
           value={commentaires_adh}
           onChange={(e) => setCommentairesAdh(e.target.value)}
           placeholder="Notes libres sur le candidat..."
+          className={`${INPUT_CLASS} resize-none`}
+        />
+      </div>
+
+      {/* Profil ADH personnalisé (CV adapté) */}
+      <div className="mb-4">
+        <label className="block text-xs font-semibold text-gray-600 mb-1">
+          Profil personnalisé (CV adapté)
+        </label>
+        <textarea
+          rows={4}
+          value={profil_adh}
+          onChange={(e) => setProfilAdh(e.target.value)}
+          placeholder="Profil personnalisé (optionnel) — sinon le profil du CV original sera utilisé"
+          className={`${INPUT_CLASS} resize-none`}
+        />
+      </div>
+
+      {/* Notes expériences (CV adapté) */}
+      <div className="mb-5">
+        <label className="block text-xs font-semibold text-gray-600 mb-1">
+          Notes expériences (CV adapté)
+        </label>
+        <textarea
+          rows={4}
+          value={notes_experiences}
+          onChange={(e) => setNotesExperiences(e.target.value)}
+          placeholder="Notes additionnelles sur les expériences (détails, autres versions de CV, réalisations clés...)"
           className={`${INPUT_CLASS} resize-none`}
         />
       </div>

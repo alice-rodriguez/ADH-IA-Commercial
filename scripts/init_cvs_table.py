@@ -40,6 +40,9 @@ COLONNES_AJOUTEES = [
     ('statut_relation',          "TEXT DEFAULT 'actif'"),
     ('date_dernier_contact',     'DATE'),
     ('date_modif_notes_adh',     'TIMESTAMP'),
+    # CV adapté ADH (CV.5.A.quater)
+    ('profil_adh',               'TEXT'),
+    ('notes_experiences',        'TEXT'),
 ]
 
 

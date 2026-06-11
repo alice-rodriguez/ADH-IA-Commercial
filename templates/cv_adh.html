@@ -303,6 +303,59 @@
     color: #444444;
     line-height: 1.45;
   }
+
+  .exp-postes {
+    list-style: none;
+    padding: 0;
+    margin: 2px 0 0 0;
+  }
+
+  .exp-postes li {
+    font-size: 9pt;
+    color: #444444;
+    padding-left: 12px;
+    position: relative;
+    margin-bottom: 2px;
+    line-height: 1.35;
+  }
+
+  .exp-postes li::before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: #ff914d;
+  }
+
+  /* ── KEY VALUE FOR ───────────────────────────────────── */
+  .key-value-box {
+    background: #fafafa;
+    border-left: 4px solid #ff914d;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+  }
+
+  .key-value-liste {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .key-value-liste li {
+    font-size: 9.5pt;
+    color: #333333;
+    padding-left: 14px;
+    position: relative;
+    margin-bottom: 5px;
+    line-height: 1.4;
+  }
+
+  .key-value-liste li::before {
+    content: "▸";
+    position: absolute;
+    left: 0;
+    color: #ff914d;
+    font-weight: bold;
+  }
 </style>
 </head>
 <body>
@@ -404,7 +457,18 @@
     <td class="col-droite">
 
       <div class="section-droite-titre">{{ labels.profil }}</div>
-      <div class="profil-texte">{{ profil_reformule }}</div>
+      <div class="profil-texte">{{ profil_final }}</div>
+
+      {% if key_value_bullets %}
+      <div class="section-droite-titre">{{ titre_key_value }}</div>
+      <div class="key-value-box">
+        <ul class="key-value-liste">
+          {% for bullet in key_value_bullets %}
+          <li>{{ bullet }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
 
       {% if experiences %}
       <div class="section-droite-titre">{{ labels.experiences }}</div>
@@ -415,7 +479,15 @@
           <span class="exp-intitule" style="color: {{ '#ff914d' if exp.a_mettre_en_avant else '#000000' }}">{{ exp.intitule }}</span>
         </div>
         <div class="exp-entreprise">{{ exp.entreprise }}</div>
+        {% if exp.postes %}
+        <ul class="exp-postes">
+          {% for poste in exp.postes %}
+          <li>{{ poste }}</li>
+          {% endfor %}
+        </ul>
+        {% elif exp.description %}
         <div class="exp-desc">{{ exp.description }}</div>
+        {% endif %}
       </div>
       {% endfor %}
       {% endif %}

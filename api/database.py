@@ -252,7 +252,7 @@ def maj_notes_adh(cv_id: int, notes: dict) -> None:
     champs_autorises = {
         'tjm_negocie', 'salaire_negocie', 'postes_cibles', 'mobilite',
         'disponibilite', 'commentaires_adh', 'statut_relation',
-        'date_dernier_contact',
+        'date_dernier_contact', 'profil_adh', 'notes_experiences',
     }
     updates = {k: v for k, v in notes.items() if k in champs_autorises}
     if not updates:
