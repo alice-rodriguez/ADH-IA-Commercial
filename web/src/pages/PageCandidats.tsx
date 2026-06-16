@@ -46,6 +46,12 @@ export default function PageCandidats() {
     setCvSelectionneId(null)
   }
 
+  async function handleSupprime(cvId: number) {
+    setCvSelectionneId(null)
+    const nouvelleListe = await fetchCVs().catch(() => cvs.filter((c) => c.id !== cvId))
+    setCvs(nouvelleListe)
+  }
+
   async function handleCvAjoute(cvId: number) {
     const nouvelleListe = await fetchCVs().catch(() => cvs)
     setCvs(nouvelleListe)
@@ -124,6 +130,7 @@ export default function PageCandidats() {
                 onSauvegarde={handleSauvegarde}
                 onAnnuler={() => setCvSelectionneId(null)}
                 onVoirOffres={(cvId, nom) => setModaleOffresCv({ cvId, nom })}
+                onSupprime={handleSupprime}
               />
             </td>
           </tr>

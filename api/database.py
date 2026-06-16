@@ -6,9 +6,12 @@ pour ne pas dupliquer la configuration.
 """
 
 import json
+import logging
 import sys
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -355,6 +358,74 @@ def convertir_en_confirme(cv_id: int) -> None:
     """Passe est_prospect = 0 pour convertir un prospect en candidat confirmé."""
     with _connexion() as conn:
         conn.execute("UPDATE cvs SET est_prospect = 0 WHERE id = ?", (cv_id,))
+
+
+def repasser_en_prospect(cv_id: int) -> None:
+    """Repasse un candidat confirmé en prospect LinkedIn (est_prospect → 1)."""
+    with _connexion() as conn:
+        conn.execute("UPDATE cvs SET est_prospect = 1 WHERE id = ?", (cv_id,))
+
+
+def supprimer_cv_cascade(cv_id: int) -> dict:
+    """Supprime un CV et toutes ses données liées en CASCADE.
+
+    Stratégie : la transaction DB est atomique ; la suppression physique
+    des fichiers est best-effort et se fait APRÈS le commit.
+    """
+    with _connexion() as conn:
+        cv_row = conn.execute(
+            "SELECT chemin_relatif FROM cvs WHERE id = ?", (cv_id,)
+        ).fetchone()
+        if cv_row is None:
+            raise ValueError(f"CV {cv_id} non trouvé")
+        chemin_source = cv_row["chemin_relatif"]
+
+        chemins_generes = [
+            r["chemin_fichier"]
+            for r in conn.execute(
+                "SELECT chemin_fichier FROM cvs_generes WHERE cv_id = ?", (cv_id,)
+            ).fetchall()
+        ]
+
+        nb_analyses = conn.execute(
+            "SELECT COUNT(*) FROM analyses_ia WHERE cv_id = ?", (cv_id,)
+        ).fetchone()[0]
+        nb_matchings = conn.execute(
+            "SELECT COUNT(*) FROM matchings WHERE cv_id = ?", (cv_id,)
+        ).fetchone()[0]
+        nb_cvs_generes = len(chemins_generes)
+
+        conn.execute("DELETE FROM analyses_ia WHERE cv_id = ?", (cv_id,))
+        conn.execute("DELETE FROM matchings WHERE cv_id = ?", (cv_id,))
+        conn.execute("DELETE FROM cvs_generes WHERE cv_id = ?", (cv_id,))
+        conn.execute("DELETE FROM cvs WHERE id = ?", (cv_id,))
+
+    # Nettoyage physique best-effort APRÈS la transaction
+    for chemin in chemins_generes:
+        try:
+            Path(chemin).unlink(missing_ok=True)
+        except Exception as e:
+            logger.warning("Suppression fichier genere echouee %s : %s", chemin, e)
+
+    if chemin_source:
+        try:
+            Path(chemin_source).unlink(missing_ok=True)
+        except Exception as e:
+            logger.warning("Suppression source PDF echouee %s : %s", chemin_source, e)
+
+    try:
+        from src.cv_genere.pdf import DRAFTS_DIR
+        for draft in DRAFTS_DIR.glob(f"{cv_id}_*.pdf"):
+            draft.unlink(missing_ok=True)
+    except Exception as e:
+        logger.warning("Suppression drafts echouee pour CV %d : %s", cv_id, e)
+
+    return {
+        "ok": True,
+        "nb_analyses_supprimees": nb_analyses,
+        "nb_matchings_supprimes": nb_matchings,
+        "nb_cvs_generes_supprimes": nb_cvs_generes,
+    }
 
 
 def get_offres_par_cv(cv_id: int, score_min: int = 30) -> list[dict]:

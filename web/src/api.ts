@@ -209,6 +209,37 @@ export async function convertirEnConfirme(cvId: number): Promise<CV> {
   return r.json()
 }
 
+export async function repasserEnProspect(cvId: number): Promise<CV> {
+  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}/repasser-prospect`, {
+    method: 'PATCH',
+    credentials: 'include',
+  })
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    throw new Error((data as { detail?: string }).detail || `Erreur ${r.status}`)
+  }
+  return r.json()
+}
+
+export interface SupprimerCvResult {
+  ok: boolean
+  nb_matchings_supprimes: number
+  nb_analyses_supprimees: number
+  nb_cvs_generes_supprimes: number
+}
+
+export async function supprimerCv(cvId: number): Promise<SupprimerCvResult> {
+  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    throw new Error((data as { detail?: string }).detail || `Erreur ${r.status}`)
+  }
+  return r.json()
+}
+
 export async function uploaderCv(
   file: File,
   onEvent: (e: UploadEvent) => void,

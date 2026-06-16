@@ -56,6 +56,8 @@ from api.database import (
     maj_statut,
     marquer_vue,
     offre_existe,
+    repasser_en_prospect,
+    supprimer_cv_cascade,
     upsert_analyse_ia,
 )
 from api.schemas import (
@@ -577,6 +579,36 @@ def convertir_confirme_endpoint(cv_id: int):
         raise
     except Exception as e:
         raise HTTPException(500, f"Erreur conversion : {e}")
+
+
+@app.patch("/api/cvs/{cv_id}/repasser-prospect", response_model=CV)
+def repasser_prospect_endpoint(cv_id: int):
+    """Repasse un candidat confirmé en prospect LinkedIn (est_prospect → 1)."""
+    if not cv_existe(cv_id):
+        raise HTTPException(404, f"CV {cv_id} non trouvé")
+    try:
+        repasser_en_prospect(cv_id)
+        cv = get_cv_par_id(cv_id)
+        if cv is None:
+            raise HTTPException(500, "CV introuvable après reconversion")
+        return cv
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur reconversion : {e}")
+
+
+@app.delete("/api/cvs/{cv_id}")
+def supprimer_cv_endpoint(cv_id: int):
+    """Supprime un CV et toutes ses données (CASCADE + fichiers physiques)."""
+    if not cv_existe(cv_id):
+        raise HTTPException(404, f"CV {cv_id} non trouvé")
+    try:
+        return supprimer_cv_cascade(cv_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur suppression CV : {e}")
 
 
 @app.post("/api/cvs/{cv_id}/offres/{offre_id}/generer-cv")
