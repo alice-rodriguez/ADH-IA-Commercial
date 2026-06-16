@@ -205,6 +205,7 @@ def get_candidats_par_offre(offre_id: int, limit: int = 20) -> list[dict]:
                 c.titre_courant,
                 c.annees_experience,
                 c.localisation_preferee,
+                c.est_prospect,
                 m.score_global,
                 m.score_competences,
                 m.score_domaine,
@@ -339,6 +340,21 @@ def upsert_analyse_ia(cv_id: int, offre_id: int, analyse: dict) -> None:
                 json.dumps(analyse.get("questions_a_poser", []), ensure_ascii=False),
             ),
         )
+
+
+def maj_est_prospect(cv_id: int, est_prospect: bool) -> None:
+    """Met à jour est_prospect pour un CV (upload avec type choisi)."""
+    with _connexion() as conn:
+        conn.execute(
+            "UPDATE cvs SET est_prospect = ? WHERE id = ?",
+            (1 if est_prospect else 0, cv_id),
+        )
+
+
+def convertir_en_confirme(cv_id: int) -> None:
+    """Passe est_prospect = 0 pour convertir un prospect en candidat confirmé."""
+    with _connexion() as conn:
+        conn.execute("UPDATE cvs SET est_prospect = 0 WHERE id = ?", (cv_id,))
 
 
 def get_offres_par_cv(cv_id: int, score_min: int = 30) -> list[dict]:

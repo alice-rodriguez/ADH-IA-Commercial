@@ -61,6 +61,7 @@ class CV(BaseModel):
     date_modif_notes_adh: Optional[str] = None
     profil_adh: Optional[str] = None
     notes_experiences: Optional[str] = None
+    est_prospect: bool = False
 
 
 class NotesAdhUpdate(BaseModel):
@@ -142,6 +143,7 @@ class CandidatMatch(BaseModel):
     titre_courant: Optional[str]
     annees_experience: Optional[int]
     localisation_preferee: Optional[str]
+    est_prospect: bool = False
     score_global: int
     score_competences: int
     score_domaine: int

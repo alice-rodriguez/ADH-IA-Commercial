@@ -56,6 +56,7 @@ export interface Candidat {
   titre_courant: string | null
   annees_experience: number | null
   localisation_preferee: string | null
+  est_prospect: boolean
   score_global: number
   score_competences: number
   score_domaine: number
@@ -113,6 +114,7 @@ export interface CV {
   date_modif_notes_adh: string | null
   profil_adh: string | null
   notes_experiences: string | null
+  est_prospect: boolean
 }
 
 export interface NotesAdhUpdate {
@@ -195,14 +197,31 @@ export type UploadEvent =
   | { step: 'matchings'; status: 'error';       message: string }
   | { step: 'done';      status: 'ok';          data: { cv_id: number } }
 
+export async function convertirEnConfirme(cvId: number): Promise<CV> {
+  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}/convertir-confirme`, {
+    method: 'PATCH',
+    credentials: 'include',
+  })
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    throw new Error((data as { detail?: string }).detail || `Erreur ${r.status}`)
+  }
+  return r.json()
+}
+
 export async function uploaderCv(
   file: File,
   onEvent: (e: UploadEvent) => void,
+  estProspect: boolean = false,
 ): Promise<void> {
   const formData = new FormData()
   formData.append('file', file)
 
-  const r = await fetch(`${API_BASE_URL}/api/cvs/upload`, {
+  const url = estProspect
+    ? `${API_BASE_URL}/api/cvs/upload?est_prospect=true`
+    : `${API_BASE_URL}/api/cvs/upload`
+
+  const r = await fetch(url, {
     method: 'POST',
     body: formData,
     credentials: 'include',

@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 
 from api.database import (
     compter_candidats_par_offre,
+    convertir_en_confirme,
     cv_existe,
     get_all_cvs,
     get_analyse_ia,
@@ -48,6 +49,7 @@ from api.database import (
     get_offres_par_cv,
     get_offres_recentes,
     get_top_score_par_offre,
+    maj_est_prospect,
     maj_favori,
     maj_notes,
     maj_notes_adh,
@@ -348,7 +350,7 @@ def liste_cvs():
 
 
 @app.post("/api/cvs/upload")
-async def upload_cv(file: UploadFile = File(...)):
+async def upload_cv(file: UploadFile = File(...), est_prospect: bool = Query(False)):
     """Upload d'un PDF : sauvegarde + extraction + profilage + matchings (SSE)."""
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Seuls les fichiers PDF sont acceptés")
@@ -384,6 +386,8 @@ async def upload_cv(file: UploadFile = File(...)):
 
         try:
             cv_id = ajouter_cv_depuis_pdf(destination)
+            if est_prospect:
+                maj_est_prospect(cv_id, True)
         except Exception as e:
             destination.unlink(missing_ok=True)
             yield "data: " + _json.dumps(
@@ -556,6 +560,23 @@ def patch_notes_adh(cv_id: int, body: NotesAdhUpdate):
         raise HTTPException(422, str(e))
     except Exception as e:
         raise HTTPException(500, f"Erreur base de données : {e}")
+
+
+@app.patch("/api/cvs/{cv_id}/convertir-confirme", response_model=CV)
+def convertir_confirme_endpoint(cv_id: int):
+    """Convertit un prospect LinkedIn en candidat confirmé (est_prospect → 0)."""
+    if not cv_existe(cv_id):
+        raise HTTPException(404, f"CV {cv_id} non trouvé")
+    try:
+        convertir_en_confirme(cv_id)
+        cv = get_cv_par_id(cv_id)
+        if cv is None:
+            raise HTTPException(500, "CV introuvable après conversion")
+        return cv
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur conversion : {e}")
 
 
 @app.post("/api/cvs/{cv_id}/offres/{offre_id}/generer-cv")

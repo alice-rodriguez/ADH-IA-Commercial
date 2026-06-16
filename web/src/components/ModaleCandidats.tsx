@@ -242,6 +242,11 @@ export default function ModaleCandidats({ offreId, titreOffre, entrepriseOffre =
                         {c.nom_candidat && (
                           <span className="font-semibold text-adh-black text-sm">{c.nom_candidat}</span>
                         )}
+                        {c.est_prospect && (
+                          <span className="inline-block px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs rounded font-semibold">
+                            🔗 Prospect
+                          </span>
+                        )}
                       </div>
                       {c.titre_courant && (
                         <p className="text-xs text-gray-500 mt-0.5">{c.titre_courant}</p>

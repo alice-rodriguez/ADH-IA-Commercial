@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CV, NotesAdhUpdate } from '../api'
-import { getLangueCV, patchNotesAdh } from '../api'
+import { convertirEnConfirme, getLangueCV, patchNotesAdh } from '../api'
 
 type StatutRelation = 'actif' | 'en_pause' | 'place' | 'inactif'
 
@@ -37,6 +37,8 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onV
   const [notes_experiences, setNotesExperiences] = useState(cv.notes_experiences ?? '')
   const [langueCV, setLangueCV] = useState<'fr' | 'en' | null>(null)
   const [saving, setSaving] = useState(false)
+  const [estProspect, setEstProspect] = useState(cv.est_prospect)
+  const [converting, setConverting] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -97,6 +99,20 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onV
     }
   }
 
+  async function handleConvertir() {
+    setConverting(true)
+    try {
+      const updated = await convertirEnConfirme(cv.id)
+      setEstProspect(false)
+      onSauvegarde(updated)
+    } catch (e) {
+      console.error(e)
+      alert('Erreur lors de la conversion')
+    } finally {
+      setConverting(false)
+    }
+  }
+
   function handleOverlayClick(e: React.MouseEvent<HTMLDivElement>) {
     if (e.target === overlayRef.current) onAnnuler()
   }
@@ -128,6 +144,22 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onV
           </button>
         )}
       </div>
+
+      {/* Bandeau prospect */}
+      {estProspect && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded flex items-center justify-between gap-3">
+          <p className="text-sm text-yellow-800">
+            🔗 <strong>Prospect LinkedIn</strong> — Profil pas encore contacté
+          </p>
+          <button
+            onClick={handleConvertir}
+            disabled={converting}
+            className="shrink-0 text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
+          >
+            {converting ? 'Conversion...' : '✅ Convertir en confirmé'}
+          </button>
+        </div>
+      )}
 
       {/* Grille 2 colonnes */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">

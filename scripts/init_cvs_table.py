@@ -43,6 +43,8 @@ COLONNES_AJOUTEES = [
     # CV adapté ADH (CV.5.A.quater)
     ('profil_adh',               'TEXT'),
     ('notes_experiences',        'TEXT'),
+    # Candidats vs Prospects (CV.8)
+    ('est_prospect',             'BOOLEAN NOT NULL DEFAULT 0'),
 ]
 
 

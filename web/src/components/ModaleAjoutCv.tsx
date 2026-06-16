@@ -42,12 +42,14 @@ function StepIcon({ status }: { status: StepStatus }) {
 interface Props {
   onClose: () => void
   onCvAjoute: (cvId: number) => void
+  estProspectInitial?: boolean
 }
 
-export default function ModaleAjoutCv({ onClose, onCvAjoute }: Props) {
+export default function ModaleAjoutCv({ onClose, onCvAjoute, estProspectInitial = false }: Props) {
   const [etape, setEtape] = useState<Etape>('upload')
   const [fichier, setFichier] = useState<File | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [estProspect, setEstProspect] = useState(estProspectInitial)
   const [progression, setProgression] = useState<EtapeProgression[]>(
     ETAPES_INITIALES.map((e) => ({ ...e })),
   )
@@ -126,7 +128,7 @@ export default function ModaleAjoutCv({ onClose, onCvAjoute }: Props) {
     }
 
     try {
-      await uploaderCv(f, handleEvent)
+      await uploaderCv(f, handleEvent, estProspect)
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Erreur inconnue'
       setErreur(msg)
@@ -198,6 +200,37 @@ export default function ModaleAjoutCv({ onClose, onCvAjoute }: Props) {
         {/* ÉTAPE : upload */}
         {etape === 'upload' && (
           <>
+            {/* Sélection type de candidat */}
+            <div className="mb-5">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                Type de candidat
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setEstProspect(false)}
+                  className={`flex-1 text-sm py-2 px-3 rounded border transition-colors text-left ${
+                    !estProspect
+                      ? 'bg-adh-orange text-white border-adh-orange font-semibold'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-adh-orange'
+                  }`}
+                >
+                  <span className="block font-semibold">✅ Confirmé</span>
+                  <span className="text-xs opacity-80">Profil connu, dispo validée</span>
+                </button>
+                <button
+                  onClick={() => setEstProspect(true)}
+                  className={`flex-1 text-sm py-2 px-3 rounded border transition-colors text-left ${
+                    estProspect
+                      ? 'bg-adh-violet text-white border-adh-violet font-semibold'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-adh-violet'
+                  }`}
+                >
+                  <span className="block font-semibold">🔗 Prospect LinkedIn</span>
+                  <span className="text-xs opacity-80">Capté sur LinkedIn, à contacter</span>
+                </button>
+              </div>
+            </div>
+
             <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
