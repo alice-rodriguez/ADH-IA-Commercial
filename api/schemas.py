@@ -152,6 +152,25 @@ class CandidatMatch(BaseModel):
     date_calcul: Optional[str]
 
 
+class PreviewCvRequest(BaseModel):
+    """Body du POST /api/cvs/{cv_id}/offres/{offre_id}/preview-cv."""
+
+    contact_email: str
+    contact_telephone: str
+    langue: Literal["fr", "en"]
+    titre_key_value: Optional[str] = None
+    instructions: Optional[str] = None
+
+
+class ConfirmCvRequest(BaseModel):
+    """Body du POST /api/cvs/{cv_id}/offres/{offre_id}/confirm-cv."""
+
+    draft_id: str
+    contact_email: str
+    contact_telephone: str
+    instructions: Optional[str] = None
+
+
 class OffreMatch(BaseModel):
     """Une offre matchée pour un CV."""
 

@@ -197,7 +197,7 @@ def _strip_fences(text: str) -> str:
     return text
 
 
-def reformuler_avec_haiku(cv_data: dict, offre_data: dict, langue: str = "fr") -> dict:
+def reformuler_avec_haiku(cv_data: dict, offre_data: dict, langue: str = "fr", instructions_supplementaires: str = "") -> dict:
     """Reformule le contenu du CV pour le cibler sur une offre.
 
     Lit cv_data["texte_brut"] comme source de vérité pour les expériences.
@@ -273,6 +273,14 @@ def reformuler_avec_haiku(cv_data: dict, offre_data: dict, langue: str = "fr") -
         offre_description=(offre_data.get("description") or "")[:2000],
         langue_instruction=langue_instruction,
     )
+
+    if instructions_supplementaires.strip():
+        prompt += (
+            "\n\nINSTRUCTIONS SUPPLÉMENTAIRES DE L'OPÉRATEUR (à respecter sauf contradiction "
+            "avec les règles anti-hallucination ci-dessus) :\n"
+            + instructions_supplementaires.strip()
+            + "\n"
+        )
 
     client = Anthropic(api_key=api_key)
     contenu = ""

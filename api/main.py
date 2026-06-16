@@ -11,6 +11,7 @@ Lancement local :
 
 import logging
 import json as _json
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -20,7 +21,14 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from src.auth.sessions import creer_session, supprimer_session, valider_session
 from src.cv_genere.langue import detecter_langue_cv
-from src.cv_genere.pdf import generer_pdf
+from src.cv_genere.pdf import (
+    DRAFTS_DIR,
+    OUTPUT_DIR,
+    confirmer_draft,
+    generer_pdf,
+    generer_pdf_draft,
+    supprimer_draft,
+)
 from src.auth.users import (
     creer_user, get_user_par_id, get_user_par_username,
     list_users, reset_password, supprimer_user,
@@ -52,6 +60,7 @@ from api.schemas import (
     CV,
     AnalyseIA,
     CandidatMatch,
+    ConfirmCvRequest,
     CreateUserRequest,
     FavoriUpdate,
     LoginRequest,
@@ -59,6 +68,7 @@ from api.schemas import (
     NotesUpdate,
     Offre,
     OffreMatch,
+    PreviewCvRequest,
     ResetPasswordRequest,
     StatutUpdate,
     UserOut,
@@ -571,3 +581,91 @@ def generer_cv_endpoint(cv_id: int, offre_id: int):
         raise HTTPException(500, str(e))
     except Exception as e:
         raise HTTPException(500, f"Erreur génération CV : {e}")
+
+
+# ── CV draft (aperçu + confirmation) ─────────────────────────────────────────
+
+
+@app.post("/api/cvs/{cv_id}/offres/{offre_id}/preview-cv")
+def preview_cv_endpoint(cv_id: int, offre_id: int, body: PreviewCvRequest):
+    """Génère un PDF draft éphémère dans cvs_generes_drafts/. Retourne le draft_id."""
+    if not cv_existe(cv_id):
+        raise HTTPException(404, f"CV {cv_id} non trouvé")
+    if not offre_existe(offre_id):
+        raise HTTPException(404, f"Offre {offre_id} non trouvée")
+    try:
+        draft_id, langue_eff, titre_eff = generer_pdf_draft(
+            cv_id=cv_id,
+            offre_id=offre_id,
+            contact_email=body.contact_email,
+            contact_telephone=body.contact_telephone,
+            langue_forcee=body.langue,
+            titre_key_value_custom=body.titre_key_value,
+            instructions_supplementaires=body.instructions or "",
+        )
+        return {
+            "draft_id": draft_id,
+            "langue_utilisee": langue_eff,
+            "titre_key_value_utilise": titre_eff,
+        }
+    except RuntimeError as e:
+        raise HTTPException(500, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Erreur génération draft : {e}")
+
+
+@app.get("/api/cvs/preview-cv-drafts/{draft_id}")
+def get_draft_pdf(draft_id: str):
+    """Sert le PDF draft en application/pdf. 404 si absent."""
+    matches = list(DRAFTS_DIR.glob(f"*_{draft_id}.pdf"))
+    if not matches:
+        raise HTTPException(404, f"Draft {draft_id} non trouvé")
+    return FileResponse(str(matches[0]), media_type="application/pdf")
+
+
+@app.post("/api/cvs/{cv_id}/offres/{offre_id}/confirm-cv")
+def confirm_cv_endpoint(cv_id: int, offre_id: int, body: ConfirmCvRequest):
+    """Confirme un draft : déplace vers cvs_generes/ et insère en BDD."""
+    if not cv_existe(cv_id):
+        raise HTTPException(404, f"CV {cv_id} non trouvé")
+    if not offre_existe(offre_id):
+        raise HTTPException(404, f"Offre {offre_id} non trouvée")
+    try:
+        chemin_final, version = confirmer_draft(
+            cv_id=cv_id,
+            offre_id=offre_id,
+            draft_id=body.draft_id,
+            contact_email=body.contact_email,
+            contact_telephone=body.contact_telephone,
+        )
+        return {"chemin_final": chemin_final, "version": version}
+    except RuntimeError as e:
+        status = 404 if "introuvable" in str(e) else 500
+        raise HTTPException(status, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Erreur confirmation draft : {e}")
+
+
+@app.post("/api/cvs/preview-cv-drafts/{draft_id}/cancel")
+def cancel_draft_endpoint(draft_id: str):
+    """Supprime un draft (fermeture modale sans téléchargement)."""
+    try:
+        supprimer_draft(draft_id)
+    except Exception as e:
+        logger.warning("Erreur suppression draft %s : %s", draft_id, e)
+    return {"ok": True}
+
+
+@app.get("/api/cvs-generes/download")
+def download_cv_genere(path: str):
+    """Télécharge un CV généré. Le chemin doit être sous cvs_generes/ (anti path-traversal)."""
+    cvs_dir = OUTPUT_DIR.resolve()
+    try:
+        chemin = Path(path).resolve()
+    except Exception:
+        raise HTTPException(400, "Chemin invalide")
+    if not str(chemin).startswith(str(cvs_dir) + os.sep):
+        raise HTTPException(403, "Accès interdit")
+    if not chemin.exists():
+        raise HTTPException(404, "Fichier non trouvé")
+    return FileResponse(str(chemin), media_type="application/pdf", filename=chemin.name)

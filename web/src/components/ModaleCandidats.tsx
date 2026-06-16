@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AnalyseIA, Candidat, CV } from '../api'
-import { fetchAnalyseIA, fetchCVParId, fetchCandidats, genererCvAdapte, lancerAnalyseIA } from '../api'
+import { fetchAnalyseIA, fetchCVParId, fetchCandidats, getLangueCV, lancerAnalyseIA } from '../api'
 import EditeurNotesAdh from './EditeurNotesAdh'
+import ModalePreviewCV from './ModalePreviewCV'
 
 const SEUILS = [30, 40, 50, 60]
 
@@ -55,12 +56,13 @@ function BarreScore({ label, score, info }: BarreScoreProps) {
 interface Props {
   offreId: number
   titreOffre: string
+  entrepriseOffre?: string
   onClose: () => void
 }
 
 type AnalyseState = AnalyseIA | 'loading' | null
 
-export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props) {
+export default function ModaleCandidats({ offreId, titreOffre, entrepriseOffre = '', onClose }: Props) {
   const [candidats, setCandidats] = useState<Candidat[]>([])
   const [loading, setLoading] = useState(true)
   const [seuilAffichage, setSeuilAffichage] = useState(30)
@@ -68,8 +70,8 @@ export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props)
   const [cvProfilOuvert, setCvProfilOuvert] = useState<CV | null>(null)
   const [analysesIA, setAnalysesIA] = useState<Record<number, AnalyseState>>({})
   const [analyseExpanded, setAnalyseExpanded] = useState<number | null>(null)
-  const [generatingCv, setGeneratingCv] = useState<number | null>(null)
-  const [generateError, setGenerateError] = useState<Record<number, string>>({})
+  const [previewCv, setPreviewCv] = useState<{ cvId: number; langueDetectee: 'fr' | 'en' } | null>(null)
+  const [openingPreviewFor, setOpeningPreviewFor] = useState<number | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
 
   async function fetchCVComplet(cvId: number) {
@@ -146,21 +148,15 @@ export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props)
     }
   }
 
-  async function handleGenererCv(cvId: number) {
-    setGeneratingCv(cvId)
-    setGenerateError((prev) => { const n = { ...prev }; delete n[cvId]; return n })
+  async function handleOuvrirPreview(cvId: number) {
+    setOpeningPreviewFor(cvId)
     try {
-      const blob = await genererCvAdapte(cvId, offreId)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `CV_ADH_IDADH-${String(cvId).padStart(3, '0')}_offre_${offreId}.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (e) {
-      setGenerateError((prev) => ({ ...prev, [cvId]: e instanceof Error ? e.message : 'Erreur génération' }))
+      const langue = await getLangueCV(cvId)
+      setPreviewCv({ cvId, langueDetectee: langue })
+    } catch {
+      setPreviewCv({ cvId, langueDetectee: 'fr' })
     } finally {
-      setGeneratingCv(null)
+      setOpeningPreviewFor(null)
     }
   }
 
@@ -319,19 +315,15 @@ export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props)
                             🔄 Relancer
                           </button>
                           <button
-                            onClick={() => handleGenererCv(c.cv_id)}
-                            disabled={generatingCv === c.cv_id}
+                            onClick={() => handleOuvrirPreview(c.cv_id)}
+                            disabled={openingPreviewFor === c.cv_id}
                             className="text-xs opacity-80 hover:opacity-100 border border-white/50 rounded px-2 py-0.5 transition-opacity disabled:opacity-40"
                             title="Générer le CV adapté ADH"
                           >
-                            {generatingCv === c.cv_id ? '⏳ Génération...' : '📄 Générer CV adapté'}
+                            {openingPreviewFor === c.cv_id ? '⏳ Chargement...' : '📄 Générer CV adapté'}
                           </button>
                         </div>
                       </div>
-                      {generateError[c.cv_id] && (
-                        <p className="text-xs text-red-600 mb-2">{generateError[c.cv_id]}</p>
-                      )}
-
                       {/* Explication */}
                       <p className="text-xs text-gray-600 mb-3 leading-relaxed">{analyse.explication}</p>
 
@@ -403,6 +395,16 @@ export default function ModaleCandidats({ offreId, titreOffre, onClose }: Props)
         mode="modale"
         onSauvegarde={() => setCvProfilOuvert(null)}
         onAnnuler={() => setCvProfilOuvert(null)}
+      />
+    )}
+
+    {previewCv && (
+      <ModalePreviewCV
+        cvId={previewCv.cvId}
+        offreId={offreId}
+        entrepriseOffre={entrepriseOffre}
+        langueDetectee={previewCv.langueDetectee}
+        onClose={() => setPreviewCv(null)}
       />
     )}
     </>

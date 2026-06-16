@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AnalyseIA, OffreMatch } from '../api'
-import { fetchAnalyseIA, fetchOffresParCv, genererCvAdapte, lancerAnalyseIA } from '../api'
+import { fetchAnalyseIA, fetchOffresParCv, getLangueCV, lancerAnalyseIA } from '../api'
+import ModalePreviewCV from './ModalePreviewCV'
 
 const SEUILS = [30, 40, 50, 60]
 
@@ -66,8 +67,8 @@ export default function ModaleOffres({ cvId, nomCandidat, onClose }: Props) {
   const [offreExpanded, setOffreExpanded] = useState<number | null>(null)
   const [analysesIA, setAnalysesIA] = useState<Record<number, AnalyseState>>({})
   const [analyseExpanded, setAnalyseExpanded] = useState<number | null>(null)
-  const [generatingCv, setGeneratingCv] = useState<number | null>(null)
-  const [generateError, setGenerateError] = useState<Record<number, string>>({})
+  const [previewCv, setPreviewCv] = useState<{ offreId: number; entrepriseOffre: string; langueDetectee: 'fr' | 'en' } | null>(null)
+  const [openingPreviewFor, setOpeningPreviewFor] = useState<number | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -134,27 +135,22 @@ export default function ModaleOffres({ cvId, nomCandidat, onClose }: Props) {
     }
   }
 
-  async function handleGenererCv(offreId: number) {
-    setGeneratingCv(offreId)
-    setGenerateError((prev) => { const n = { ...prev }; delete n[offreId]; return n })
+  async function handleOuvrirPreview(offreId: number, entreprise: string) {
+    setOpeningPreviewFor(offreId)
     try {
-      const blob = await genererCvAdapte(cvId, offreId)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `CV_ADH_IDADH-${String(cvId).padStart(3, '0')}_offre_${offreId}.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (e) {
-      setGenerateError((prev) => ({ ...prev, [offreId]: e instanceof Error ? e.message : 'Erreur génération' }))
+      const langue = await getLangueCV(cvId)
+      setPreviewCv({ offreId, entrepriseOffre: entreprise, langueDetectee: langue })
+    } catch {
+      setPreviewCv({ offreId, entrepriseOffre: entreprise, langueDetectee: 'fr' })
     } finally {
-      setGeneratingCv(null)
+      setOpeningPreviewFor(null)
     }
   }
 
   const offresFiltrees = offres.filter((o) => o.score_global >= seuilAffichage)
 
   return (
+    <>
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
@@ -309,19 +305,15 @@ export default function ModaleOffres({ cvId, nomCandidat, onClose }: Props) {
                             🔄 Relancer
                           </button>
                           <button
-                            onClick={() => handleGenererCv(o.offre_id)}
-                            disabled={generatingCv === o.offre_id}
+                            onClick={() => handleOuvrirPreview(o.offre_id, o.entreprise || '')}
+                            disabled={openingPreviewFor === o.offre_id}
                             className="text-xs opacity-80 hover:opacity-100 border border-white/50 rounded px-2 py-0.5 transition-opacity disabled:opacity-40"
                             title="Générer le CV adapté ADH"
                           >
-                            {generatingCv === o.offre_id ? '⏳ Génération...' : '📄 Générer CV adapté'}
+                            {openingPreviewFor === o.offre_id ? '⏳ Chargement...' : '📄 Générer CV adapté'}
                           </button>
                         </div>
                       </div>
-                      {generateError[o.offre_id] && (
-                        <p className="text-xs text-red-600 mb-2">{generateError[o.offre_id]}</p>
-                      )}
-
                       {/* Explication */}
                       <p className="text-xs text-gray-600 mb-3 leading-relaxed">{analyse.explication}</p>
 
@@ -383,5 +375,16 @@ export default function ModaleOffres({ cvId, nomCandidat, onClose }: Props) {
         )}
       </div>
     </div>
+
+    {previewCv && (
+      <ModalePreviewCV
+        cvId={cvId}
+        offreId={previewCv.offreId}
+        entrepriseOffre={previewCv.entrepriseOffre}
+        langueDetectee={previewCv.langueDetectee}
+        onClose={() => setPreviewCv(null)}
+      />
+    )}
+    </>
   )
 }

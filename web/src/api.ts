@@ -346,6 +346,95 @@ export async function resetPassword(userId: number, newPassword: string): Promis
   }
 }
 
+// ── CV draft (aperçu + confirmation) ─────────────────────────────────────────
+
+export function calculerTitreKeyValue(entreprise: string, langue: 'fr' | 'en'): string {
+  if (entreprise) {
+    return langue === 'fr'
+      ? `POINTS FORTS POUR ${entreprise.toUpperCase()}`
+      : `KEY VALUE FOR ${entreprise.toUpperCase()}`
+  }
+  return langue === 'fr' ? 'POINTS FORTS' : 'KEY VALUE PROPOSITION'
+}
+
+export interface PreviewCvParams {
+  contact_email: string
+  contact_telephone: string
+  langue: 'fr' | 'en'
+  titre_key_value?: string
+  instructions?: string
+}
+
+export interface PreviewCvResponse {
+  draft_id: string
+  langue_utilisee: 'fr' | 'en'
+  titre_key_value_utilise: string
+}
+
+export interface ConfirmCvResponse {
+  chemin_final: string
+  version: number
+}
+
+export async function previewCv(cvId: number, offreId: number, params: PreviewCvParams): Promise<PreviewCvResponse> {
+  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}/offres/${offreId}/preview-cv`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+    credentials: 'include',
+  })
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    throw new Error((data as { detail?: string }).detail || `Erreur ${r.status}`)
+  }
+  return r.json()
+}
+
+export async function confirmCv(
+  cvId: number,
+  offreId: number,
+  draftId: string,
+  params: { contact_email: string; contact_telephone: string; instructions?: string },
+): Promise<ConfirmCvResponse> {
+  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}/offres/${offreId}/confirm-cv`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ draft_id: draftId, ...params }),
+    credentials: 'include',
+  })
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    throw new Error((data as { detail?: string }).detail || `Erreur ${r.status}`)
+  }
+  return r.json()
+}
+
+export async function cancelCvDraft(draftId: string): Promise<{ ok: boolean }> {
+  const r = await fetch(`${API_BASE_URL}/api/cvs/preview-cv-drafts/${draftId}/cancel`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!r.ok) throw new Error(`Erreur cancel draft : ${r.status}`)
+  return r.json()
+}
+
+export async function fetchDraftPdf(draftId: string): Promise<Blob> {
+  const r = await fetch(`${API_BASE_URL}/api/cvs/preview-cv-drafts/${draftId}`, {
+    credentials: 'include',
+  })
+  if (!r.ok) throw new Error(`Erreur GET draft PDF : ${r.status}`)
+  return r.blob()
+}
+
+export async function downloadFinalCv(chemin: string): Promise<Blob> {
+  const r = await fetch(
+    `${API_BASE_URL}/api/cvs-generes/download?path=${encodeURIComponent(chemin)}`,
+    { credentials: 'include' },
+  )
+  if (!r.ok) throw new Error(`Erreur GET CV final : ${r.status}`)
+  return r.blob()
+}
+
 export async function genererCvAdapte(cvId: number, offreId: number): Promise<Blob> {
   const r = await fetch(
     `${API_BASE_URL}/api/cvs/${cvId}/offres/${offreId}/generer-cv`,
