@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { Offre } from '../types'
 import { FILTRES_INITIAUX } from '../utils/filtrer'
 import type { FiltresState } from '../utils/filtrer'
@@ -55,6 +55,8 @@ interface Props {
 }
 
 export default function Filtres({ offres, filtres, onChange, nbAffichees, nbAvecMatching }: Props) {
+  const [avancesOuverts, setAvancesOuverts] = useState(false)
+
   const sources = useMemo(() => {
     const set = new Set<string>()
     offres.forEach((o) => { if (o.source) set.add(o.source) })
@@ -107,63 +109,24 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees, nbAvec
     <div className="sticky top-0 z-10 bg-white border-b shadow-sm p-4">
       <div className="flex flex-wrap gap-6 md:items-start">
 
-        {/* Source */}
+        {/* Mots-clés */}
         <div>
-          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Source</p>
-          <div className="flex flex-wrap gap-2">
-            {sources.map((src) => (
-              <label key={src} className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filtres.sources.includes(src)}
-                  onChange={() => toggleSource(src)}
-                  className="w-3.5 h-3.5 accent-[#ff914d]"
-                />
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${sourceBadgeClass(src)}`}>
-                  {src}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Contrat */}
-        <div>
-          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Contrat</p>
-          <div className="flex flex-wrap gap-2">
-            {contrats.map((ctr) => (
-              <label key={ctr} className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filtres.contrats.includes(ctr)}
-                  onChange={() => toggleContrat(ctr)}
-                  className="w-3.5 h-3.5 accent-[#ff914d]"
-                />
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${contratBadgeClass(ctr)}`}>
-                  {ctr}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Statut */}
-        <div>
-          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Statut</p>
-          <div className="flex flex-wrap gap-2">
-            {STATUT_OPTIONS.map((opt) => (
-              <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filtres.statuts.includes(opt.value)}
-                  onChange={() => toggleStatut(opt.value)}
-                  className="w-3.5 h-3.5 accent-[#ff914d]"
-                />
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${opt.classes}`}>
-                  {opt.label}
-                </span>
-              </label>
-            ))}
+          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Mots-clés</p>
+          <div className="relative">
+            <svg
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            </svg>
+            <input
+              type="text"
+              value={filtres.motsCles}
+              onChange={(e) => onChange({ ...filtres, motsCles: e.target.value })}
+              placeholder="SAP, MOA banque..."
+              className="w-56 pl-7 pr-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:border-adh-orange"
+            />
           </div>
         </div>
 
@@ -205,39 +168,6 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees, nbAvec
               </button>
             ))}
           </div>
-        </div>
-
-        {/* Mots-clés */}
-        <div>
-          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Mots-clés</p>
-          <div className="relative">
-            <svg
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none"
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round"
-                d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-            </svg>
-            <input
-              type="text"
-              value={filtres.motsCles}
-              onChange={(e) => onChange({ ...filtres, motsCles: e.target.value })}
-              placeholder="SAP, MOA banque..."
-              className="w-56 pl-7 pr-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:border-adh-orange"
-            />
-          </div>
-        </div>
-
-        {/* Lieu */}
-        <div>
-          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Lieu</p>
-          <input
-            type="text"
-            value={filtres.lieu}
-            onChange={(e) => onChange({ ...filtres, lieu: e.target.value })}
-            placeholder="Paris, remote..."
-            className="w-40 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:border-adh-orange"
-          />
         </div>
 
         {/* Vues */}
@@ -316,6 +246,93 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees, nbAvec
           )}
         </div>
 
+      </div>
+
+      {/* Filtres avancés (repliables) */}
+      <div className="mt-3 border-t pt-3">
+        <button
+          onClick={() => setAvancesOuverts((v) => !v)}
+          className="flex items-center gap-1.5 text-xs font-bold uppercase text-gray-500 hover:text-adh-orange transition-colors"
+        >
+          <span>{avancesOuverts ? '▼' : '▶'}</span>
+          <span>Filtres avancés</span>
+        </button>
+
+        {avancesOuverts && (
+          <div className="flex flex-wrap gap-6 md:items-start mt-3">
+            {/* Source */}
+            <div>
+              <p className="text-xs font-bold uppercase text-gray-500 mb-1">Source</p>
+              <div className="flex flex-wrap gap-2">
+                {sources.map((src) => (
+                  <label key={src} className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filtres.sources.includes(src)}
+                      onChange={() => toggleSource(src)}
+                      className="w-3.5 h-3.5 accent-[#ff914d]"
+                    />
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${sourceBadgeClass(src)}`}>
+                      {src}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Contrat */}
+            <div>
+              <p className="text-xs font-bold uppercase text-gray-500 mb-1">Contrat</p>
+              <div className="flex flex-wrap gap-2">
+                {contrats.map((ctr) => (
+                  <label key={ctr} className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filtres.contrats.includes(ctr)}
+                      onChange={() => toggleContrat(ctr)}
+                      className="w-3.5 h-3.5 accent-[#ff914d]"
+                    />
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${contratBadgeClass(ctr)}`}>
+                      {ctr}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Statut */}
+            <div>
+              <p className="text-xs font-bold uppercase text-gray-500 mb-1">Statut</p>
+              <div className="flex flex-wrap gap-2">
+                {STATUT_OPTIONS.map((opt) => (
+                  <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filtres.statuts.includes(opt.value)}
+                      onChange={() => toggleStatut(opt.value)}
+                      className="w-3.5 h-3.5 accent-[#ff914d]"
+                    />
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${opt.classes}`}>
+                      {opt.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Lieu */}
+            <div>
+              <p className="text-xs font-bold uppercase text-gray-500 mb-1">Lieu</p>
+              <input
+                type="text"
+                value={filtres.lieu}
+                onChange={(e) => onChange({ ...filtres, lieu: e.target.value })}
+                placeholder="Paris, remote..."
+                className="w-40 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:border-adh-orange"
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

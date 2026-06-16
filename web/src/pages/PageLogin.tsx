@@ -32,8 +32,8 @@ export default function PageLogin({ onLoggedIn }: Props) {
   return (
     <div className="min-h-screen bg-adh-black flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <div className="flex flex-col items-center gap-4 mb-8">
-          <img src="/picto-adh.png" alt="Pictogramme ADH" className="h-16" />
+        <div className="flex items-center justify-center gap-4 mb-8">
+          <img src="/picto-adh.png" alt="Pictogramme ADH" className="h-14" />
           <img src="/logo-adh.png" alt="Logo ADH" className="h-10" />
         </div>
 

@@ -314,8 +314,7 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onV
       </div>
 
       {/* Zone dangereuse */}
-      <div className="mb-5 border border-red-200 rounded-lg p-4 bg-red-50">
-        <h3 className="text-sm font-bold text-red-700 mb-3">Zone dangereuse</h3>
+      <div className="mb-5 border border-red-200 rounded-lg p-3 bg-red-50">
         <div className="flex flex-wrap gap-3">
           {estProspect ? (
             <button
