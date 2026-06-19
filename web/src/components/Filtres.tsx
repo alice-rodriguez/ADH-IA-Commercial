@@ -130,42 +130,22 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees, nbAvec
           </div>
         </div>
 
-        {/* Score IA */}
+        {/* Contrat */}
         <div>
-          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Score IA</p>
-          <div className="flex gap-1">
-            {SCORE_OPTIONS.map((opt) => (
-              <button
-                key={opt.label}
-                onClick={() => onChange({ ...filtres, scoreMin: opt.value })}
-                className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors ${
-                  filtres.scoreMin === opt.value
-                    ? 'bg-adh-orange text-white border-adh-orange'
-                    : 'bg-white text-adh-black border-gray-300 hover:border-adh-orange'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Période */}
-        <div>
-          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Période</p>
-          <div className="flex gap-1">
-            {PERIODE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => onChange({ ...filtres, periode: opt.value })}
-                className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors ${
-                  filtres.periode === opt.value
-                    ? 'bg-adh-orange text-white border-adh-orange'
-                    : 'bg-white text-adh-black border-gray-300 hover:border-adh-orange'
-                }`}
-              >
-                {opt.label}
-              </button>
+          <p className="text-xs font-bold uppercase text-gray-500 mb-1">Contrat</p>
+          <div className="flex flex-wrap gap-2">
+            {contrats.map((ctr) => (
+              <label key={ctr} className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filtres.contrats.includes(ctr)}
+                  onChange={() => toggleContrat(ctr)}
+                  className="w-3.5 h-3.5 accent-[#ff914d]"
+                />
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${contratBadgeClass(ctr)}`}>
+                  {ctr}
+                </span>
+              </label>
             ))}
           </div>
         </div>
@@ -280,22 +260,42 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees, nbAvec
               </div>
             </div>
 
-            {/* Contrat */}
+            {/* Score IA */}
             <div>
-              <p className="text-xs font-bold uppercase text-gray-500 mb-1">Contrat</p>
-              <div className="flex flex-wrap gap-2">
-                {contrats.map((ctr) => (
-                  <label key={ctr} className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={filtres.contrats.includes(ctr)}
-                      onChange={() => toggleContrat(ctr)}
-                      className="w-3.5 h-3.5 accent-[#ff914d]"
-                    />
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${contratBadgeClass(ctr)}`}>
-                      {ctr}
-                    </span>
-                  </label>
+              <p className="text-xs font-bold uppercase text-gray-500 mb-1">Score IA</p>
+              <div className="flex gap-1">
+                {SCORE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.label}
+                    onClick={() => onChange({ ...filtres, scoreMin: opt.value })}
+                    className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors ${
+                      filtres.scoreMin === opt.value
+                        ? 'bg-adh-orange text-white border-adh-orange'
+                        : 'bg-white text-adh-black border-gray-300 hover:border-adh-orange'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Période */}
+            <div>
+              <p className="text-xs font-bold uppercase text-gray-500 mb-1">Période</p>
+              <div className="flex gap-1">
+                {PERIODE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => onChange({ ...filtres, periode: opt.value })}
+                    className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors ${
+                      filtres.periode === opt.value
+                        ? 'bg-adh-orange text-white border-adh-orange'
+                        : 'bg-white text-adh-black border-gray-300 hover:border-adh-orange'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
                 ))}
               </div>
             </div>
