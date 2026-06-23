@@ -34,7 +34,7 @@ PROMPT_UTILISATEUR = """Analyse ce CV et extrais les informations suivantes en J
 
 Règles :
 - competences_techniques : 5 à 20 entrées, technos/outils/méthodes (ex: SAP, JIRA, Scrum, ITIL, ALM, Java, AWS...)
-- domaines : secteurs métier (ex: banque, assurance, énergie, santé, industrie, telecom, retail, public)
+- domaines : 3 à 10 entrées — secteurs métier ET domaines fonctionnels, en français OU en anglais tel qu'écrit dans le CV (ex: banque, assurance, énergie, santé, telecom, Trade Finance, Cash Management, Corporate Banking, Capital Markets, Retail Banking, Supply Chain, Insurance, Public Sector, Leasing, Automotive) — inclure OBLIGATOIREMENT tout domaine sectoriel ou fonctionnel mentionné au moins 2 fois dans le CV
 - annees_experience : déduis du parcours ou null si impossible à estimer
 - types_contrat_souhaites : []  si non explicite ; sinon CDI/Freelance/CDD/Stage/Alternance
 - localisation_preferee : ville ou région ; "remote" si full remote ; null si non précisé
