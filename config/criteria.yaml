@@ -18,6 +18,9 @@ profils:
   - "directeur de projet"
   - "directeur de projets"
   - "project director"
+  - "test manager"
+  - "test lead"
+  - "responsable recette"
 
 # Secteurs d'activité ciblés
 secteurs:
@@ -77,6 +80,14 @@ mots_cles:
     - "directrice de projet"
     - "directrice de projets"
     - "project director"
+    - "test manager"
+    - "testeur"
+    - "lead test"
+    - "test lead"
+    - "responsable recette"
+    - "chef de projet recette"
+    - "QA manager"
+    - "recette fonctionnelle"
 
   # Au moins 1 mot-clé sectoriel doit être présent
   sectoriels:
