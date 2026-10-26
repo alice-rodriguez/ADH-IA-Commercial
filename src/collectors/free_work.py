@@ -10,6 +10,7 @@ Cible : chef de projet / business analyst / MOA
 """
 
 import logging
+import re
 import time
 from datetime import datetime
 
@@ -37,6 +38,18 @@ URLS_RECHERCHE = [
         "MOA IDF",
     ),
     (
+        "https://www.free-work.com/fr/tech-it/jobs?locations=fr~ile-de-france~~&query=test%20manager",
+        "test manager IDF",
+    ),
+    (
+        "https://www.free-work.com/fr/tech-it/jobs?locations=fr~ile-de-france~~&query=QA",
+        "QA IDF",
+    ),
+    (
+        "https://www.free-work.com/fr/tech-it/jobs?locations=fr~ile-de-france~~&query=PMO",
+        "PMO IDF",
+    ),
+    (
         "https://www.free-work.com/fr/tech-it/jobs?query=chef%20de%20projet&remote=full",
         "chef de projet remote",
     ),
@@ -47,6 +60,18 @@ URLS_RECHERCHE = [
     (
         "https://www.free-work.com/fr/tech-it/jobs?query=MOA&remote=full",
         "MOA remote",
+    ),
+    (
+        "https://www.free-work.com/fr/tech-it/jobs?query=test%20manager&remote=full",
+        "test manager remote",
+    ),
+    (
+        "https://www.free-work.com/fr/tech-it/jobs?query=QA&remote=full",
+        "QA remote",
+    ),
+    (
+        "https://www.free-work.com/fr/tech-it/jobs?query=PMO&remote=full",
+        "PMO remote",
     ),
 ]
 
@@ -70,6 +95,15 @@ CONTRATS_FW = {
     "interim": "Intérim",
     "intérim": "Intérim",
 }
+
+
+def _texte(el) -> str:
+    """Texte d'un élément avec espaces entre les nœuds enfants.
+
+    get_text(strip=True) sans séparateur colle les nœuds texte adjacents :
+    un titre découpé en spans (surlignage) donnait "ChefdeProjetIT".
+    """
+    return re.sub(r"\s+", " ", el.get_text(separator=" ", strip=True)).strip()
 
 
 class FreeWorkCollector(BaseCollector):
@@ -147,7 +181,7 @@ class FreeWorkCollector(BaseCollector):
             url = BASE_URL + href
             source_id = href.rstrip("/").split("/")[-1]
             titre_span = lien_titre.find("span", class_="fw-text-highlight")
-            titre = titre_span.get_text(strip=True) if titre_span else lien_titre.get_text(strip=True)
+            titre = _texte(titre_span) if titre_span else _texte(lien_titre)
             if not titre:
                 return None
 
@@ -158,7 +192,7 @@ class FreeWorkCollector(BaseCollector):
             # TODO Phase B : collecter tous les badges pour gérer "Freelance + CDI".
             type_contrat = "Freelance"
             for div in carte.find_all("div", class_=lambda c: c and "truncate" in c):
-                texte = div.get_text(strip=True).lower()
+                texte = _texte(div).lower()
                 if texte in CONTRATS_FW:
                     type_contrat = CONTRATS_FW[texte]
                     break
@@ -167,7 +201,7 @@ class FreeWorkCollector(BaseCollector):
             entreprise = ""
             div_bold = carte.find("div", class_=lambda c: c and "font-bold" in c)
             if div_bold:
-                entreprise = div_bold.get_text(strip=True)
+                entreprise = _texte(div_bold)
 
             # ── Localisation ──────────────────────────────────────────────────────
             lieu = ""
@@ -190,7 +224,7 @@ class FreeWorkCollector(BaseCollector):
                 "div", class_=lambda c: c and "fw-text-highlight" in c and "line-clamp-4" in c
             )
             if div_desc:
-                description = div_desc.get_text(strip=True)
+                description = _texte(div_desc)
 
             # ── Compétences/tags ──────────────────────────────────────────────────
             # Les tags sont dans des <a class="bg-brand-75 ..."> ; le texte du titre
@@ -198,7 +232,7 @@ class FreeWorkCollector(BaseCollector):
             tags = []
             for tag_a in carte.find_all("a", class_=lambda c: c and "bg-brand-75" in c):
                 span_tag = tag_a.find("span", class_="fw-text-highlight")
-                texte_tag = span_tag.get_text(strip=True) if span_tag else tag_a.get_text(strip=True)
+                texte_tag = _texte(span_tag) if span_tag else _texte(tag_a)
                 if texte_tag:
                     tags.append(texte_tag)
             if tags:
