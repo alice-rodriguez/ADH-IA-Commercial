@@ -8,6 +8,7 @@ Orchestration du pipeline complet :
   4. Passe 2 — Filtre IA (Claude Haiku)
   5. Matching CV ↔ offres (TF-IDF, gratuit)
   6. Envoi du digest email (Microsoft Graph API)
+  7. Recalcul des matchings CV ↔ offres pour l'interface web
 
 Variable d'environnement MODE_TEST=true : injecte 2 offres fictives
 pour valider le pipeline sans attendre de vraies offres.
@@ -250,6 +251,20 @@ def run():
         if succes:
             hashes = [o["hash"] for o in offres_passe2 if o.get("hash")]
             database.marquer_envoyees(hashes)
+
+    # ── 7. Recalcul des matchings (interface web) ────────────────────────────
+    # Après l'envoi du digest pour ne pas retarder le mail. Un échec ici ne
+    # doit jamais faire échouer le pipeline.
+    logger.info("\n── ÉTAPE 7 : Recalcul des matchings ──")
+    try:
+        from src.matching.calculer import recalculer_tous
+        stats_matching = recalculer_tous()
+        logger.info(
+            "Matchings recalculés : %d CV traité(s), %d matching(s) calculé(s)",
+            stats_matching["nb_cvs"], stats_matching["nb_matchings"],
+        )
+    except Exception as e:
+        logger.error("Recalcul des matchings en échec (pipeline poursuivi) : %s", e)
 
     logger.info("\n" + "=" * 60)
     logger.info("Agent ADH — terminé. Coût total IA : €%.4f", cout_ia)
