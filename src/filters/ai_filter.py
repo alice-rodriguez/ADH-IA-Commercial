@@ -34,6 +34,7 @@ def analyser_offre(offre: dict, criteres: dict, client: anthropic.Anthropic) -> 
     """
     profils = ", ".join(criteres.get("profils", []))
     secteurs = ", ".join(criteres.get("secteurs", []))
+    types_contrat = ", ".join(criteres.get("types_contrat", []))
 
     prompt = f"""Tu es un expert en recrutement pour un cabinet de conseil.
 Tu dois évaluer si cette offre correspond à nos critères de placement.
@@ -41,13 +42,18 @@ Tu dois évaluer si cette offre correspond à nos critères de placement.
 CRITÈRES DE NOTRE CABINET :
 - Profils placés : {profils}
 - Secteurs : {secteurs}
+- Types de contrat acceptés, tous sur un pied d'égalité : {types_contrat}
+  La mission freelance est un mode de placement normal pour notre cabinet :
+  le type de contrat ne doit jamais faire baisser le score.
 - Localisation : Île-de-France, Remote ou Hybride
+  Si le lieu est absent ou imprécis, c'est une information manquante neutre :
+  ne pénalise pas l'offre et ne la rejette pas pour ce motif.
 - Niveau requis : profils confirmés (minimum 3-5 ans d'expérience)
 
 OFFRE À ANALYSER :
 Titre : {offre.get('titre', '')}
 Entreprise : {offre.get('entreprise', '')}
-Lieu : {offre.get('lieu', '')}
+Lieu : {offre.get('lieu') or 'non précisé'}
 Type de contrat : {offre.get('type_contrat', '')}
 Description : {offre.get('description', '')[:800]}
 
