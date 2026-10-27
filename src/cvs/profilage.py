@@ -74,7 +74,7 @@ def profiler_cv(texte_brut: str) -> Optional[dict]:
         response = client.messages.create(
             model=MODELE,
             max_tokens=MAX_TOKENS,
-            temperature=0,
+            extra_body={"temperature": 0},
             system=PROMPT_SYSTEME,
             messages=[{"role": "user", "content": prompt}],
         )

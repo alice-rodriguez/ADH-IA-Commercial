@@ -289,7 +289,7 @@ def reformuler_avec_haiku(cv_data: dict, offre_data: dict, langue: str = "fr", i
         response = client.messages.create(
             model=MODELE,
             max_tokens=MAX_TOKENS,
-            temperature=0,
+            extra_body={"temperature": 0},
             system=PROMPT_SYSTEME,
             messages=[{"role": "user", "content": prompt}],
         )

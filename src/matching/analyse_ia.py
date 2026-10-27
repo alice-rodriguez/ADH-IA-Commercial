@@ -108,7 +108,7 @@ def analyser_couple(cv: dict, offre: dict, scores: dict | None = None) -> dict |
         message = client.messages.create(
             model=MODEL,
             max_tokens=1024,
-            temperature=0,
+            extra_body={"temperature": 0},
             messages=[{"role": "user", "content": prompt}],
         )
         text = message.content[0].text.strip()
