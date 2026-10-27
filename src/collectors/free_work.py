@@ -12,6 +12,7 @@ Cible : chef de projet / business analyst / MOA
 import logging
 import re
 import time
+import unicodedata
 from datetime import datetime
 
 from bs4 import BeautifulSoup
@@ -104,6 +105,33 @@ def _texte(el) -> str:
     un titre découpé en spans (surlignage) donnait "ChefdeProjetIT".
     """
     return re.sub(r"\s+", " ", el.get_text(separator=" ", strip=True)).strip()
+
+
+def _normaliser_libelle(texte: str) -> str:
+    """strip + minuscules + sans accents : "  Télétravail " → "teletravail"."""
+    texte = unicodedata.normalize("NFD", texte.strip().lower())
+    return "".join(c for c in texte if unicodedata.category(c) != "Mn")
+
+
+def _valeur_par_libelle(carte, libelle: str) -> str:
+    """Valeur d'un bloc "libellé + valeur" de la carte desktop.
+
+    Gabarit : <div><span>Lieu</span><span><svg/><span>Valeur</span></span></div>.
+    Le nombre et l'ordre des blocs (Lieu, Télétravail, TJM…) varient d'une
+    offre à l'autre : on repère le bloc par son libellé, jamais par position.
+    """
+    for bloc in carte.find_all("div"):
+        span_libelle = bloc.find("span", recursive=False)
+        if not span_libelle or _normaliser_libelle(_texte(span_libelle)) != libelle:
+            continue
+        # Dernier span "feuille" du bloc hors libellé : celui qui suit le svg
+        valeurs = [
+            s for s in bloc.find_all("span")
+            if s is not span_libelle and not s.find("span")
+        ]
+        if valeurs:
+            return _texte(valeurs[-1])
+    return ""
 
 
 class FreeWorkCollector(BaseCollector):
@@ -204,10 +232,17 @@ class FreeWorkCollector(BaseCollector):
                 entreprise = _texte(div_bold)
 
             # ── Localisation ──────────────────────────────────────────────────────
-            lieu = ""
-            span_title = carte.find("span", title=True)
-            if span_title:
-                lieu = span_title["title"]
+            # Carte desktop : bloc libellé "Lieu" + valeur (pas de span[title]).
+            lieu = _valeur_par_libelle(carte, "lieu")
+            # La barre d'infos (TJM, Télétravail, Lieu) est sœur du div.flex-1,
+            # dans le parent propre à l'offre.
+            if not lieu and carte.parent is not None:
+                lieu = _valeur_par_libelle(carte.parent, "lieu")
+            # Secours : span[title] (carte mobile / ancienne structure)
+            if not lieu:
+                span_title = carte.find("span", title=True)
+                if span_title:
+                    lieu = span_title["title"]
 
             # ── Date de publication ───────────────────────────────────────────────
             date_pub = None
