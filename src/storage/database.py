@@ -85,7 +85,22 @@ def initialiser():
             if colonne not in colonnes:
                 conn.execute(f"ALTER TABLE offres ADD COLUMN {colonne} INTEGER")
                 logger.info("Migration : colonne offres.%s ajoutée", colonne)
+    migrer_cvs()
     logger.info("Base de données prête : %s", DB_PATH)
+
+
+def migrer_cvs():
+    """Migration idempotente de la table cvs (créée par scripts/init_cvs_table.py).
+
+    Ajoute nom_modifie_manuellement si absente : drapeau mis à 1 quand le nom
+    est corrigé à la main, pour que le re-profilage ne l'écrase pas.
+    Sans effet si la table cvs n'existe pas encore.
+    """
+    with _connexion() as conn:
+        colonnes = {row[1] for row in conn.execute("PRAGMA table_info(cvs)")}
+        if colonnes and "nom_modifie_manuellement" not in colonnes:
+            conn.execute("ALTER TABLE cvs ADD COLUMN nom_modifie_manuellement INTEGER DEFAULT 0")
+            logger.info("Migration : colonne cvs.nom_modifie_manuellement ajoutée")
 
 
 def _calculer_hash(titre: str, entreprise: str, source: str) -> str:

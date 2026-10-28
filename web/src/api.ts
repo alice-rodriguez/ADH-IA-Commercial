@@ -118,6 +118,7 @@ export interface CV {
 }
 
 export interface NotesAdhUpdate {
+  nom_candidat?: string
   tjm_negocie?: number | null
   salaire_negocie?: number | null
   postes_cibles?: string | null

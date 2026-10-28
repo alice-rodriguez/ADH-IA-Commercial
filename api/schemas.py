@@ -67,6 +67,7 @@ class CV(BaseModel):
 class NotesAdhUpdate(BaseModel):
     """Body du PATCH /api/cvs/{id}/notes-adh."""
 
+    nom_candidat: Optional[str] = None
     tjm_negocie: Optional[int] = None
     salaire_negocie: Optional[int] = None
     postes_cibles: Optional[str] = None

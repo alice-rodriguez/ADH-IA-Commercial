@@ -11,7 +11,7 @@ sys.path.insert(0, '.')
 from src.cvs.extraction import extraire_texte_pdf
 from src.cvs.profilage import profiler_cv
 from src.matching.calculer import recalculer_tous
-from src.storage.database import _connexion
+from src.storage.database import _connexion, migrer_cvs
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
@@ -23,7 +23,9 @@ def _stocker_profil(conn, nom: str, profil: dict) -> None:
     conn.execute(
         """
         UPDATE cvs SET
-            nom_candidat             = ?,
+            -- Nom corrigé à la main (drapeau à 1) : jamais écrasé
+            nom_candidat             = CASE WHEN COALESCE(nom_modifie_manuellement, 0) = 1
+                                            THEN nom_candidat ELSE ? END,
             titre_courant            = ?,
             competences_techniques   = ?,
             domaines                 = ?,
@@ -67,6 +69,8 @@ def scanner_dossier() -> dict:
 
     stats = {"ajouts": 0, "mises_a_jour": 0, "inchanges": 0, "orphelins": 0, "profiles": 0}
     noms_fichiers_disque = set()
+
+    migrer_cvs()  # _stocker_profil lit nom_modifie_manuellement
 
     with _connexion() as conn:
         for pdf in pdfs:

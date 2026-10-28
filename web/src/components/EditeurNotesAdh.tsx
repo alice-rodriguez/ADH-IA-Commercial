@@ -24,6 +24,7 @@ interface Props {
 }
 
 export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onVoirOffres, onSupprime }: Props) {
+  const [nom_candidat, setNomCandidat] = useState(cv.nom_candidat ?? '')
   const [tjm_negocie, setTjmNegocie] = useState<number | null>(cv.tjm_negocie)
   const [salaire_negocie, setSalaireNegocie] = useState<number | null>(cv.salaire_negocie)
   const [postes_cibles, setPostesCibles] = useState(cv.postes_cibles ?? '')
@@ -51,6 +52,15 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onV
 
   async function handleSauvegarder() {
     const payload: NotesAdhUpdate = {}
+
+    const nomSaisi = nom_candidat.trim()
+    if (nomSaisi !== (cv.nom_candidat ?? '').trim()) {
+      if (nomSaisi === '') {
+        alert('Le nom du candidat ne peut pas être vide')
+        return
+      }
+      payload.nom_candidat = nomSaisi
+    }
 
     if (tjm_negocie !== cv.tjm_negocie) payload.tjm_negocie = tjm_negocie
     if (salaire_negocie !== cv.salaire_negocie) payload.salaire_negocie = salaire_negocie
@@ -185,6 +195,18 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onV
           </p>
         </div>
       )}
+
+      {/* Nom du candidat (extrait du CV au profilage, corrigeable ici) */}
+      <div className="mb-4">
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Nom du candidat</label>
+        <input
+          type="text"
+          value={nom_candidat}
+          onChange={(e) => setNomCandidat(e.target.value)}
+          placeholder="ex: Jean DUPONT"
+          className={INPUT_CLASS}
+        />
+      </div>
 
       {/* Grille 2 colonnes */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">

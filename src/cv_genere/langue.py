@@ -44,7 +44,7 @@ def detecter_langue_cv(texte: str) -> str:
     """Détecte la langue du texte brut du CV.
 
     Compte les occurrences de mots fréquents EN vs FR.
-    Défaut 'fr' si total < 10 mots détectés ou égalité.
+    Défaut 'fr' si total < 5 mots détectés ou égalité.
 
     Returns:
         "en" ou "fr"

@@ -62,8 +62,9 @@ def profiler_un_cv(cv_id: int) -> dict:
         ValueError: si le CV est introuvable ou si Haiku échoue.
     """
     from src.cvs.profilage import profiler_cv
-    from src.storage.database import _connexion
+    from src.storage.database import _connexion, migrer_cvs
 
+    migrer_cvs()
     with _connexion() as conn:
         row = conn.execute("SELECT * FROM cvs WHERE id = ?", (cv_id,)).fetchone()
 
@@ -79,7 +80,9 @@ def profiler_un_cv(cv_id: int) -> dict:
         conn.execute(
             """
             UPDATE cvs SET
-                nom_candidat             = ?,
+                -- Nom corrigé à la main (drapeau à 1) : jamais écrasé
+                nom_candidat             = CASE WHEN COALESCE(nom_modifie_manuellement, 0) = 1
+                                                THEN nom_candidat ELSE ? END,
                 titre_courant            = ?,
                 competences_techniques   = ?,
                 domaines                 = ?,

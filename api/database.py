@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.storage.database import DB_PATH, _connexion  # noqa: E402
+from src.storage.database import DB_PATH, _connexion, migrer_cvs  # noqa: E402
 
 
 def get_offres_recentes(jours: int = 30) -> list[dict]:
@@ -254,6 +254,7 @@ def cv_existe(cv_id: int) -> bool:
 def maj_notes_adh(cv_id: int, notes: dict) -> None:
     """UPDATE partiel des Notes ADH. Seuls les champs fournis sont mis à jour."""
     champs_autorises = {
+        'nom_candidat',
         'tjm_negocie', 'salaire_negocie', 'postes_cibles', 'mobilite',
         'disponibilite', 'commentaires_adh', 'statut_relation',
         'date_dernier_contact', 'profil_adh', 'notes_experiences',
@@ -262,10 +263,20 @@ def maj_notes_adh(cv_id: int, notes: dict) -> None:
     if not updates:
         raise ValueError("Aucun champ Notes ADH à mettre à jour.")
 
+    if 'nom_candidat' in updates:
+        nom = (updates['nom_candidat'] or "").strip()
+        if not nom:
+            raise ValueError("Le nom du candidat ne peut pas être vide.")
+        updates['nom_candidat'] = nom
+
     cols = ", ".join(f"{k} = ?" for k in updates) + \
            ", date_modif_notes_adh = datetime('now')"
+    # Nom corrigé à la main : protégé contre l'écrasement par le re-profilage
+    if 'nom_candidat' in updates:
+        cols += ", nom_modifie_manuellement = 1"
     values = list(updates.values()) + [cv_id]
 
+    migrer_cvs()
     with _connexion() as conn:
         conn.execute(f"UPDATE cvs SET {cols} WHERE id = ?", values)
 
