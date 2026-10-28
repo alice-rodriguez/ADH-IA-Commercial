@@ -17,6 +17,7 @@ from datetime import datetime
 
 from bs4 import BeautifulSoup
 
+from ..utils.parsing import parse_tjm
 from .base import BaseCollector
 
 logger = logging.getLogger(__name__)
@@ -134,6 +135,16 @@ def _valeur_par_libelle(carte, libelle: str) -> str:
     return ""
 
 
+def _tjm_depuis_texte(texte: str) -> tuple[int | None, int | None]:
+    """'400-500 €⁄j' → (400, 500) ; '490 €⁄j' → (490, 490) ; sinon (None, None).
+
+    Free-Work sépare € et j par U+2044 (FRACTION SLASH), pas par un "/" ASCII :
+    on normalise avant parse_tjm, qui attend "€/j".
+    """
+    texte = (texte or "").replace("\u2044", "/").replace("\xa0", " ")
+    return parse_tjm(texte)
+
+
 class FreeWorkCollector(BaseCollector):
     def collecter(self, criteres: dict) -> list[dict]:
         toutes = []
@@ -244,6 +255,13 @@ class FreeWorkCollector(BaseCollector):
                 if span_title:
                     lieu = span_title["title"]
 
+            # ── TJM ───────────────────────────────────────────────────────────────
+            # Même barre d'infos que le lieu : bloc libellé "TJM", sœur du div.flex-1.
+            texte_tjm = _valeur_par_libelle(carte, "tjm")
+            if not texte_tjm and carte.parent is not None:
+                texte_tjm = _valeur_par_libelle(carte.parent, "tjm")
+            tjm_min, tjm_max = _tjm_depuis_texte(texte_tjm)
+
             # ── Date de publication ───────────────────────────────────────────────
             date_pub = None
             time_tag = carte.find("time")
@@ -285,8 +303,8 @@ class FreeWorkCollector(BaseCollector):
                 source=self.nom,
             )
             offre["source_id"] = source_id
-            offre["tjm_min"] = None
-            offre["tjm_max"] = None
+            offre["tjm_min"] = tjm_min
+            offre["tjm_max"] = tjm_max
             if date_pub:
                 offre["date_publication"] = date_pub.isoformat()
 

@@ -76,6 +76,15 @@ def initialiser():
             CREATE INDEX IF NOT EXISTS idx_statut        ON actions_utilisateur(statut);
             CREATE INDEX IF NOT EXISTS idx_competence    ON competences_offre(competence);
         """)
+
+        # Migration idempotente : une base créée avant l'ajout de tjm_min/tjm_max
+        # au schéma n'a pas ces colonnes (CREATE TABLE IF NOT EXISTS ne modifie
+        # jamais une table existante), et sauvegarder() les écrit.
+        colonnes = {row[1] for row in conn.execute("PRAGMA table_info(offres)")}
+        for colonne in ("tjm_min", "tjm_max"):
+            if colonne not in colonnes:
+                conn.execute(f"ALTER TABLE offres ADD COLUMN {colonne} INTEGER")
+                logger.info("Migration : colonne offres.%s ajoutée", colonne)
     logger.info("Base de données prête : %s", DB_PATH)
 
 
@@ -123,8 +132,9 @@ def sauvegarder(offre: dict) -> bool:
             conn.execute(
                 """
                 INSERT OR IGNORE INTO offres
-                  (hash, titre, entreprise, lieu, type_contrat, source, url, description, date_collecte)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  (hash, titre, entreprise, lieu, type_contrat, source, url, description,
+                   tjm_min, tjm_max, date_collecte)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     hash_offre,
@@ -135,6 +145,8 @@ def sauvegarder(offre: dict) -> bool:
                     offre.get("source"),
                     offre.get("url"),
                     offre.get("description"),
+                    offre.get("tjm_min"),
+                    offre.get("tjm_max"),
                     datetime.now().isoformat(),
                 ),
             )
