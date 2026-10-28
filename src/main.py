@@ -2,6 +2,7 @@
 Point d'entrée principal de l'agent ADH.
 
 Orchestration du pipeline complet :
+  0. Mise à jour des CV (scan de cvs/, re-profilage des PDF modifiés)
   1. Collecte (toutes les sources en parallèle)
   2. Déduplication (base SQLite)
   3. Passe 1 — Filtre mots-clés (gratuit)
@@ -165,6 +166,22 @@ def run():
 
     criteres, sources_cfg = charger_config()
     database.initialiser()
+
+    # ── 0. Mise à jour des CV ────────────────────────────────────────────────
+    # Un PDF remplacé dans cvs/ est ré-extrait et re-profilé (Haiku, seulement
+    # pour les PDF nouveaux ou modifiés). Pas de recalcul des matchings ici :
+    # l'ÉTAPE 7 s'en charge. Un échec ne doit jamais faire échouer le pipeline.
+    logger.info("\n── ÉTAPE 0 : Mise à jour des CV ──")
+    try:
+        from src.cvs.scan import scanner_dossier
+        stats_cvs = scanner_dossier()
+        logger.info(
+            "CV : %d ajouté(s), %d mis à jour, %d inchangé(s), %d profilé(s)",
+            stats_cvs["ajouts"], stats_cvs["mises_a_jour"],
+            stats_cvs["inchanges"], stats_cvs["profiles"],
+        )
+    except Exception as e:
+        logger.error("Mise à jour des CV en échec (pipeline poursuivi) : %s", e)
 
     # ── 1. Collecte ──────────────────────────────────────────────────────────
     logger.info("\n── ÉTAPE 1 : Collecte des offres ──")
