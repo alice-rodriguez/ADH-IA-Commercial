@@ -47,6 +47,7 @@ def initialiser():
                 salaire_min           INTEGER,
                 salaire_max           INTEGER,
                 date_collecte         TEXT    NOT NULL,
+                date_derniere_vue     TEXT,
                 date_envoi            TEXT,
                 envoyee               INTEGER DEFAULT 0
             );
@@ -85,6 +86,15 @@ def initialiser():
             if colonne not in colonnes:
                 conn.execute(f"ALTER TABLE offres ADD COLUMN {colonne} INTEGER")
                 logger.info("Migration : colonne offres.%s ajoutée", colonne)
+
+        # date_derniere_vue : dernière fois que l'offre a été vue en ligne.
+        # Initialisée à date_collecte pour les offres existantes, sinon le
+        # signal serait vide jusqu'au prochain passage de chaque offre.
+        if "date_derniere_vue" not in colonnes:
+            conn.execute("ALTER TABLE offres ADD COLUMN date_derniere_vue TEXT")
+            conn.execute("UPDATE offres SET date_derniere_vue = date_collecte")
+            logger.info("Migration : colonne offres.date_derniere_vue ajoutée "
+                        "(initialisée à date_collecte)")
     migrer_cvs()
     logger.info("Base de données prête : %s", DB_PATH)
 
@@ -125,6 +135,9 @@ def sauvegarder(offre: dict) -> bool:
     """
     Sauvegarde une offre dans la base.
     Retourne True si sauvegardée, False si doublon (déjà vue récemment).
+
+    Offre déjà connue (même hash) : seule date_derniere_vue est mise à jour ;
+    date_collecte (première fois vue) et les autres champs ne bougent pas.
     """
     hash_offre = _calculer_hash(
         offre.get("titre", ""),
@@ -134,8 +147,18 @@ def sauvegarder(offre: dict) -> bool:
 
     fenetre = offre.get("fenetre_deduplication_jours", 7)
     date_limite = (datetime.now() - timedelta(days=fenetre)).isoformat()
+    maintenant = datetime.now().isoformat()
 
     with _connexion() as conn:
+        # Offre revue : on trace son passage (aucun effet si le hash est nouveau)
+        try:
+            conn.execute(
+                "UPDATE offres SET date_derniere_vue = ? WHERE hash = ?",
+                (maintenant, hash_offre),
+            )
+        except sqlite3.Error as e:
+            logger.error("Erreur MAJ date_derniere_vue '%s': %s", offre.get("titre"), e)
+
         existing = conn.execute(
             "SELECT id FROM offres WHERE hash = ? AND date_collecte > ?",
             (hash_offre, date_limite),
@@ -148,8 +171,8 @@ def sauvegarder(offre: dict) -> bool:
                 """
                 INSERT OR IGNORE INTO offres
                   (hash, titre, entreprise, lieu, type_contrat, source, url, description,
-                   tjm_min, tjm_max, date_collecte)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   tjm_min, tjm_max, date_collecte, date_derniere_vue)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     hash_offre,
@@ -162,7 +185,8 @@ def sauvegarder(offre: dict) -> bool:
                     offre.get("description"),
                     offre.get("tjm_min"),
                     offre.get("tjm_max"),
-                    datetime.now().isoformat(),
+                    maintenant,
+                    maintenant,
                 ),
             )
             return True

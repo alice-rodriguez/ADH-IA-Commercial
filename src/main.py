@@ -140,6 +140,19 @@ def collecter_en_parallele(collecteurs: list, criteres: dict) -> tuple[list, lis
     return toutes_offres, resultats_sources
 
 
+def bilan_sources(resultats_sources: list) -> tuple[list, list, list]:
+    """Répartit les sources en (OK, en échec, à 0 offre) — listes de noms."""
+    ok, echecs, vides = [], [], []
+    for r in resultats_sources:
+        if r.get("statut") != "ok":
+            echecs.append(r.get("nom", "?"))
+        elif r.get("count", 0) == 0:
+            vides.append(r.get("nom", "?"))
+        else:
+            ok.append(r.get("nom", "?"))
+    return ok, echecs, vides
+
+
 def dedupliquer_et_sauvegarder(offres: list, criteres: dict) -> tuple[list, int]:
     fenetre = criteres.get("seuils", {}).get("fenetre_deduplication_jours", 7)
     nouvelles, doublons = [], 0
@@ -216,9 +229,21 @@ def run():
     offres_passe2, cout_ia = ai_filter.filtrer(offres_passe1, criteres)
     stats["passe2"] = len(offres_passe2)
 
+    # Santé du run : une source en échec ou à 0 ne permet pas de conclure
+    # que ses offres ont disparu.
+    sources_ok, sources_echec, sources_vides = bilan_sources(resultats_sources)
+    sans_resultat = [f"{n} (échec)" for n in sources_echec] + [f"{n} (0 offre)" for n in sources_vides]
+    if sans_resultat:
+        logger.warning(
+            "\n⚠ RUN DÉGRADÉ : %d source(s) sans résultat — %s",
+            len(sans_resultat), ", ".join(sans_resultat),
+        )
+
     logger.info(
-        "\nPipeline : %d collectées → %d après dédup → %d pré-filtre → %d retenues — Coût IA : €%.4f",
+        "\nPipeline : %d collectées → %d après dédup → %d pré-filtre → %d retenues — Coût IA : €%.4f"
+        " — %d source(s) OK / %d en échec / %d à 0 offre",
         stats["collectees"], stats["dedup"], stats["passe1"], stats["passe2"], cout_ia,
+        len(sources_ok), len(sources_echec), len(sources_vides),
     )
 
     # Mise à jour des scores IA dans la base
