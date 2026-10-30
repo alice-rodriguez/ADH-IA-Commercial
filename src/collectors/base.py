@@ -33,6 +33,12 @@ class BaseCollector(ABC):
         self.delai = config.get("delai_secondes", 3)
         self.session = requests.Session()
         self.session.headers.update(HEADERS)
+        # Échecs partiels de collecte (une URL / page qui échoue sans faire
+        # échouer toute la source), remontés par main.py dans la santé du run.
+        # Vide pour les collecteurs qui ne les renseignent pas.
+        self.erreurs_collecte: list[str] = []
+        # Nombre de recherches lancées (dénominateur du message "x sur N"), si connu
+        self.nb_recherches: int | None = None
 
     @abstractmethod
     def collecter(self, criteres: dict) -> list[dict]:

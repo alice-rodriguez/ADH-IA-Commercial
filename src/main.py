@@ -127,6 +127,9 @@ def collecter_en_parallele(collecteurs: list, criteres: dict) -> tuple[list, lis
                     "nom": collecteur.nom,
                     "statut": "ok",
                     "count": len(offres),
+                    # Échecs partiels remontés par le collecteur (vide si aucun)
+                    "erreurs": list(getattr(collecteur, "erreurs_collecte", None) or []),
+                    "nb_recherches": getattr(collecteur, "nb_recherches", None),
                 })
                 logger.info("✓ %s : %d offres collectées", collecteur.nom, len(offres))
             except Exception as e:
@@ -140,17 +143,33 @@ def collecter_en_parallele(collecteurs: list, criteres: dict) -> tuple[list, lis
     return toutes_offres, resultats_sources
 
 
-def bilan_sources(resultats_sources: list) -> tuple[list, list, list]:
-    """Répartit les sources en (OK, en échec, à 0 offre) — listes de noms."""
-    ok, echecs, vides = [], [], []
+def bilan_sources(resultats_sources: list) -> dict[str, list[str]]:
+    """Répartit les sources par état de santé.
+
+    Retourne {"ok", "partielles", "echecs", "vides"} : listes de libellés.
+    - partielle : des offres collectées MAIS des URL / pages en échec
+    - échec     : exception, ou 0 offre avec des URL / pages en échec
+    - vide      : 0 offre sans erreur signalée
+    """
+    bilan = {"ok": [], "partielles": [], "echecs": [], "vides": []}
     for r in resultats_sources:
+        nom = r.get("nom", "?")
+        erreurs = r.get("erreurs") or []
+        if erreurs:
+            total = r.get("nb_recherches")
+            detail = f"{len(erreurs)} URL en échec" + (f" sur {total}" if total else "")
         if r.get("statut") != "ok":
-            echecs.append(r.get("nom", "?"))
+            bilan["echecs"].append(f"{nom} (échec)")
         elif r.get("count", 0) == 0:
-            vides.append(r.get("nom", "?"))
+            if erreurs:
+                bilan["echecs"].append(f"{nom} (échec : {detail})")
+            else:
+                bilan["vides"].append(f"{nom} (0 offre)")
+        elif erreurs:
+            bilan["partielles"].append(f"{nom} (partielle : {detail})")
         else:
-            ok.append(r.get("nom", "?"))
-    return ok, echecs, vides
+            bilan["ok"].append(nom)
+    return bilan
 
 
 def dedupliquer_et_sauvegarder(offres: list, criteres: dict) -> tuple[list, int]:
@@ -231,19 +250,19 @@ def run():
 
     # Santé du run : une source en échec ou à 0 ne permet pas de conclure
     # que ses offres ont disparu.
-    sources_ok, sources_echec, sources_vides = bilan_sources(resultats_sources)
-    sans_resultat = [f"{n} (échec)" for n in sources_echec] + [f"{n} (0 offre)" for n in sources_vides]
-    if sans_resultat:
+    bilan = bilan_sources(resultats_sources)
+    degradees = bilan["echecs"] + bilan["vides"] + bilan["partielles"]
+    if degradees:
         logger.warning(
-            "\n⚠ RUN DÉGRADÉ : %d source(s) sans résultat — %s",
-            len(sans_resultat), ", ".join(sans_resultat),
+            "\n⚠ RUN DÉGRADÉ : %d source(s) sans résultat complet — %s",
+            len(degradees), ", ".join(degradees),
         )
 
     logger.info(
         "\nPipeline : %d collectées → %d après dédup → %d pré-filtre → %d retenues — Coût IA : €%.4f"
-        " — %d source(s) OK / %d en échec / %d à 0 offre",
+        " — %d source(s) OK / %d partielle(s) / %d en échec / %d à 0 offre",
         stats["collectees"], stats["dedup"], stats["passe1"], stats["passe2"], cout_ia,
-        len(sources_ok), len(sources_echec), len(sources_vides),
+        len(bilan["ok"]), len(bilan["partielles"]), len(bilan["echecs"]), len(bilan["vides"]),
     )
 
     # Mise à jour des scores IA dans la base

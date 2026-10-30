@@ -147,6 +147,8 @@ def _tjm_depuis_texte(texte: str) -> tuple[int | None, int | None]:
 
 class FreeWorkCollector(BaseCollector):
     def collecter(self, criteres: dict) -> list[dict]:
+        self.erreurs_collecte = []
+        self.nb_recherches = len(URLS_RECHERCHE)
         toutes = []
         for url_base, label in URLS_RECHERCHE:
             toutes.extend(self._scraper_url(url_base, label))
@@ -171,6 +173,7 @@ class FreeWorkCollector(BaseCollector):
                     break
                 if resp.status_code != 200:
                     logger.warning("[Free-Work] '%s' page %d : HTTP %d", label, page_num, resp.status_code)
+                    self.erreurs_collecte.append(f"'{label}' page {page_num} : HTTP {resp.status_code}")
                     break
 
                 soup = BeautifulSoup(resp.text, "lxml")
@@ -195,6 +198,9 @@ class FreeWorkCollector(BaseCollector):
 
             except Exception as e:
                 logger.error("[Free-Work] Erreur '%s' page %d : %s", label, page_num, e)
+                self.erreurs_collecte.append(
+                    f"'{label}' page {page_num} : {type(e).__name__} — {str(e)[:80]}"
+                )
                 break
 
         return offres
