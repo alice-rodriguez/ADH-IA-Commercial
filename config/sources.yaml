@@ -15,7 +15,7 @@ sources:
     delai_secondes: 1
 
   apec:
-    active: true
+    active: false
     nom: "APEC"
     type: "playwright"
     description: "Association Pour l'Emploi des Cadres — SPA Angular (API REST + Playwright fallback)"
