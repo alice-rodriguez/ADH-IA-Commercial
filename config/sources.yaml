@@ -54,6 +54,14 @@ sources:
     url_base: "https://www.free-work.com"
     delai_secondes: 2
 
+  hellowork:
+    active: true
+    nom: "HelloWork"
+    type: "scraping_html"
+    description: "Offres Indépendant / Freelance (HTML statique, sans authentification) — description lue sur la page détail"
+    url_base: "https://www.hellowork.com"
+    delai_secondes: 2
+
   freelance_com:
     active: false
     nom: "Freelance.com"

@@ -42,6 +42,7 @@ from src.collectors.indeed import IndeedCollector
 from src.collectors.wtj import WTJCollector
 from src.collectors.free_work import FreeWorkCollector
 from src.collectors.freelance_com import FreelanceComCollector
+from src.collectors.hellowork import HelloWorkCollector
 from src.filters import keyword_filter, ai_filter
 from src.matching.cv_parser import charger_tous_les_cvs
 from src.matching.matcher import MoteurMatching
@@ -95,6 +96,7 @@ def construire_collecteurs(sources_cfg: dict) -> list:
         "welcometothejungle": WTJCollector,
         "free_work":          FreeWorkCollector,
         "freelance_com":      FreelanceComCollector,
+        "hellowork":          HelloWorkCollector,
     }
     collecteurs = []
     for cle, cfg in sources_cfg.get("sources", {}).items():
