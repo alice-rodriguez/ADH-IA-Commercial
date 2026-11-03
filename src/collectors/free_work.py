@@ -23,7 +23,7 @@ from .base import BaseCollector
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://www.free-work.com"
-PAGES_MAX = 5
+PAGES_MAX = 8
 
 # (url_base, label pour les logs)
 URLS_RECHERCHE = [
@@ -52,6 +52,18 @@ URLS_RECHERCHE = [
         "PMO IDF",
     ),
     (
+        "https://www.free-work.com/fr/tech-it/jobs?locations=fr~ile-de-france~~&query=product%20owner",
+        "product owner IDF",
+    ),
+    (
+        "https://www.free-work.com/fr/tech-it/jobs?locations=fr~ile-de-france~~&query=AMOA",
+        "AMOA IDF",
+    ),
+    (
+        "https://www.free-work.com/fr/tech-it/jobs?locations=fr~ile-de-france~~&query=directeur%20de%20projet",
+        "directeur de projet IDF",
+    ),
+    (
         "https://www.free-work.com/fr/tech-it/jobs?query=chef%20de%20projet&remote=full",
         "chef de projet remote",
     ),
@@ -74,6 +86,18 @@ URLS_RECHERCHE = [
     (
         "https://www.free-work.com/fr/tech-it/jobs?query=PMO&remote=full",
         "PMO remote",
+    ),
+    (
+        "https://www.free-work.com/fr/tech-it/jobs?query=product%20owner&remote=full",
+        "product owner remote",
+    ),
+    (
+        "https://www.free-work.com/fr/tech-it/jobs?query=AMOA&remote=full",
+        "AMOA remote",
+    ),
+    (
+        "https://www.free-work.com/fr/tech-it/jobs?query=directeur%20de%20projet&remote=full",
+        "directeur de projet remote",
     ),
 ]
 
