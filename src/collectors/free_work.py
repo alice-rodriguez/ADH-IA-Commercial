@@ -52,10 +52,6 @@ URLS_RECHERCHE = [
         "PMO IDF",
     ),
     (
-        "https://www.free-work.com/fr/tech-it/jobs?locations=fr~ile-de-france~~&query=product%20owner",
-        "product owner IDF",
-    ),
-    (
         "https://www.free-work.com/fr/tech-it/jobs?locations=fr~ile-de-france~~&query=AMOA",
         "AMOA IDF",
     ),
@@ -86,10 +82,6 @@ URLS_RECHERCHE = [
     (
         "https://www.free-work.com/fr/tech-it/jobs?query=PMO&remote=full",
         "PMO remote",
-    ),
-    (
-        "https://www.free-work.com/fr/tech-it/jobs?query=product%20owner&remote=full",
-        "product owner remote",
     ),
     (
         "https://www.free-work.com/fr/tech-it/jobs?query=AMOA&remote=full",
