@@ -18,3 +18,5 @@ cvs/*.PDF
 
 # CVs générés ADH
 cvs_generes/
+
+run_agent.ps1
