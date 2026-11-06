@@ -11,8 +11,10 @@ Logique :
   - Score = nombre de mots-clés trouvés (utilisé pour trier avant l'IA)
 """
 
+import functools
 import re
 import logging
+import unicodedata
 from collections import Counter
 from typing import Tuple
 
@@ -20,8 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 def _normaliser_texte(texte: str) -> str:
-    """Minuscules, sans accents parasites pour comparaison robuste."""
-    return texte.lower()
+    """Minuscules, sans accents parasites pour comparaison robuste.
+
+    Appliquée à l'identique au texte de l'offre ET aux mots-clés (via _motif).
+    "Chargée" → "chargee", "Télécom" → "telecom".
+    """
+    texte = unicodedata.normalize("NFD", (texte or "").lower())
+    return "".join(c for c in texte if unicodedata.category(c) != "Mn")
 
 
 def _normaliser_titre(titre: str) -> str:
@@ -32,13 +39,33 @@ def _normaliser_titre(titre: str) -> str:
     """
     titre = re.sub(r'\([^)]*\)', '', titre)
     titre = re.sub(r'\s+', ' ', titre).strip()
-    return titre.lower()
+    return _normaliser_texte(titre)
+
+
+@functools.lru_cache(maxsize=2048)
+def _motif(mot_cle: str) -> re.Pattern:
+    """Motif d'un mot-clé, tolérant au nombre et au genre de chaque mot.
+
+    Pour les mots de 4 lettres et plus, (?:e?s?|fes?) accepte "", "e", "s",
+    "es", "fe", "fes" : "chef de projet" trouve "chef de projets", "chefs de
+    projet", "cheffe de projet" ; "chargé de projet" trouve "chargée de projet".
+    Les mots de 1 à 3 lettres (sigles : BA, SI, MOA, PMO…) sont cherchés à
+    l'identique, sinon "ba" trouverait "bas" (Pays-Bas) et "si" trouverait "sis".
+    \\W+ entre les mots couvre "chef-de-projet" et les espaces multiples.
+    """
+    parties = []
+    for mot in _normaliser_texte(mot_cle).split():
+        echappe = re.escape(mot)
+        if len(mot) >= 4:
+            echappe += r"(?:e?s?|fes?)"
+        parties.append(echappe)
+    corps = r"\W+".join(parties)
+    return re.compile(rf"\b{corps}\b")
 
 
 def _contient(texte: str, mot: str) -> bool:
-    """Vérifie si un mot ou expression apparaît dans le texte (mot entier ou expression)."""
-    pattern = r"\b" + re.escape(mot.lower()) + r"\b"
-    return bool(re.search(pattern, texte))
+    """Vérifie si un mot-clé apparaît dans le texte DÉJÀ normalisé (_normaliser_texte)."""
+    return bool(_motif(mot).search(texte))
 
 
 def evaluer(offre: dict, criteres: dict) -> Tuple[bool, int, str]:
