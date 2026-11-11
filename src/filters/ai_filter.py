@@ -36,6 +36,19 @@ def analyser_offre(offre: dict, criteres: dict, client: anthropic.Anthropic) -> 
     secteurs = ", ".join(criteres.get("secteurs", []))
     types_contrat = ", ".join(criteres.get("types_contrat", []))
 
+    # Marché public (BOAMP) : ce n'est pas une mission freelance, sans cette
+    # précision l'IA risque de rejeter la source en bloc.
+    clause_source = ""
+    if offre.get("source") == "BOAMP":
+        clause_source = """
+CAS PARTICULIER — MARCHÉ PUBLIC (BOAMP) :
+- Cette offre est un marché public auquel ADH répond directement, sans ESN
+  intermédiaire. Ce mode de contractualisation est recherché : il ne doit
+  jamais faire baisser le score.
+- Le critère de pertinence reste le métier : pilotage de projet, AMOA,
+  conduite du changement sur système d'information.
+"""
+
     prompt = f"""Tu es un expert en recrutement pour un cabinet de conseil.
 Tu dois évaluer si cette offre correspond à nos critères de placement.
 
@@ -49,7 +62,7 @@ CRITÈRES DE NOTRE CABINET :
   Si le lieu est absent ou imprécis, c'est une information manquante neutre :
   ne pénalise pas l'offre et ne la rejette pas pour ce motif.
 - Niveau requis : profils confirmés (minimum 3-5 ans d'expérience)
-
+{clause_source}
 OFFRE À ANALYSER :
 Titre : {offre.get('titre', '')}
 Entreprise : {offre.get('entreprise', '')}

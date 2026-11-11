@@ -88,6 +88,8 @@ mots_cles:
     - "chef de projet recette"
     - "QA manager"
     - "recette fonctionnelle"
+    - "assistance à maîtrise d'ouvrage"
+    - "conduite de projet"
 
   # Au moins 1 mot-clé sectoriel doit être présent
   sectoriels:

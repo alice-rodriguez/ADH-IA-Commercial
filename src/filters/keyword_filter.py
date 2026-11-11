@@ -20,6 +20,16 @@ from typing import Tuple
 
 logger = logging.getLogger(__name__)
 
+# Sources exemptées du pré-filtre : leurs offres passent directement au filtre IA.
+# Règle de traitement (pas un critère métier) : elle reste dans le code, pas dans
+# criteria.yaml.
+#   - BOAMP    : la requête API exige déjà le métier ET un qualificatif
+#                informatique ; le pré-filtre ferait double emploi et rejetterait
+#                les formulations administratives des marchés publics.
+#   - Manuelle : offre ajoutée à la main par Alice (fonctionnalité à venir) ;
+#                elle ne doit jamais être écartée.
+SOURCES_EXEMPTEES = ["BOAMP", "Manuelle"]
+
 
 def _normaliser_texte(texte: str) -> str:
     """Minuscules, sans accents parasites pour comparaison robuste.
@@ -130,10 +140,22 @@ def filtrer(offres: list, criteres: dict) -> list:
     """
     retenues = []
     rejets = 0
+    exemptees = 0
     # TEMPORAIRE — pour calibrage du pré-filtre
     stats_rejets: Counter = Counter()
 
     for offre in offres:
+        if offre.get("source") in SOURCES_EXEMPTEES:
+            exemptees += 1
+            offre["score_pre_filtre"] = 0
+            retenues.append(offre)
+            logger.info(
+                "[PREFILTRE-EXEMPT] %s | %s | source exemptée",
+                offre.get("source", "?"),
+                offre.get("titre", "")[:80],
+            )
+            continue
+
         ok, score, raison = evaluer(offre, criteres)
         if ok:
             offre["score_pre_filtre"] = score
@@ -160,8 +182,8 @@ def filtrer(offres: list, criteres: dict) -> list:
 
     taux_rejet = (rejets / len(offres) * 100) if offres else 0
     logger.info(
-        "Passe 1 (mots-clés) : %d entrées → %d retenues, %d rejetées (%.0f%%)",
-        len(offres), len(retenues), rejets, taux_rejet,
+        "Passe 1 (mots-clés) : %d entrées → %d retenues (dont %d exemptées), %d rejetées (%.0f%%)",
+        len(offres), len(retenues), exemptees, rejets, taux_rejet,
     )
 
     # TEMPORAIRE — pour calibrage du pré-filtre
