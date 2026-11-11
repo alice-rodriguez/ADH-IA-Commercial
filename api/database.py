@@ -53,7 +53,10 @@ def get_offres_recentes(jours: int = 30) -> list[dict]:
                 a.notes                       AS notes
             FROM offres o
             LEFT JOIN actions_utilisateur a ON a.offre_id = o.id
+            -- Une offre "Manuelle" n'est jamais revue par un collecteur : elle
+            -- échappe à la fenêtre de fraîcheur, sinon elle disparaîtrait.
             WHERE o.date_collecte >= datetime('now', '-' || ? || ' days')
+               OR o.source = 'Manuelle'
             ORDER BY
                 o.score_ia IS NULL,
                 o.score_ia DESC,

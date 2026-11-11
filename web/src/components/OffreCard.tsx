@@ -22,6 +22,7 @@ const SOURCE_COLORS: Record<string, string> = {
   'APEC': 'bg-blue-500 text-white',
   'Free-Work': 'bg-orange-400 text-white',
   'Welcome to the Jungle': 'bg-green-500 text-white',
+  'Manuelle': 'bg-adh-violet text-adh-black',
 }
 
 function sourceBadgeClass(source: string | null): string {

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { CompteurCandidat } from '../api'
+import type { CompteurCandidat, OffreManuelleResultat } from '../api'
 import { fetchCompteurs, fetchOffres } from '../api'
 import Filtres from '../components/Filtres'
+import ModaleAjoutOffre from '../components/ModaleAjoutOffre'
 import ModaleCandidats from '../components/ModaleCandidats'
 import OffreCard from '../components/OffreCard'
 import type { Offre } from '../types'
@@ -14,7 +15,12 @@ export default function PageOffres() {
   const [error, setError] = useState<string | null>(null)
   const [filtres, setFiltres] = useState<FiltresState>(FILTRES_INITIAUX)
   const [compteurs, setCompteurs] = useState<Record<number, CompteurCandidat>>({})
-  const [modaleOuverte, setModaleOuverte] = useState<{ offreId: number; titreOffre: string } | null>(null)
+  const [modaleOuverte, setModaleOuverte] = useState<{
+    offreId: number
+    titreOffre: string
+    avertissement?: string
+  } | null>(null)
+  const [ajoutOuvert, setAjoutOuvert] = useState(false)
 
   useEffect(() => {
     Promise.all([fetchOffres(), fetchCompteurs(30)])
@@ -46,6 +52,22 @@ export default function PageOffres() {
     setModaleOuverte({ offreId, titreOffre })
   }
 
+  function handleOffreAjoutee(resultat: OffreManuelleResultat) {
+    setAjoutOuvert(false)
+    // L'offre (nouvelle ou mise à jour) en tête de liste, filtres remis à zéro pour qu'elle soit visible
+    setOffres((prev) => [resultat.offre, ...prev.filter((o) => o.id !== resultat.id)])
+    setFiltres(FILTRES_INITIAUX)
+    fetchCompteurs(30).then(setCompteurs).catch(() => {})
+    // Ouverture directe de la fiche de l'offre, avec ses candidats classés
+    setModaleOuverte({
+      offreId: resultat.id,
+      titreOffre: resultat.titre,
+      avertissement: resultat.structuration_reussie
+        ? undefined
+        : "L'offre est enregistrée, mais ses champs n'ont pas pu être structurés automatiquement : ils sont à compléter à la main.",
+    })
+  }
+
   return (
     <>
       {!loading && !error && offres.length > 0 && (
@@ -59,6 +81,15 @@ export default function PageOffres() {
       )}
 
       <main className="flex-1 p-6 md:p-8">
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => setAjoutOuvert(true)}
+            className="text-sm font-semibold bg-adh-orange text-white rounded-lg px-4 py-2 hover:opacity-90 transition-opacity shadow"
+          >
+            + Ajouter une annonce
+          </button>
+        </div>
+
         {loading && (
           <p className="text-center text-gray-400 mt-16 text-lg">Chargement des offres...</p>
         )}
@@ -109,8 +140,13 @@ export default function PageOffres() {
         <ModaleCandidats
           offreId={modaleOuverte.offreId}
           titreOffre={modaleOuverte.titreOffre}
+          avertissement={modaleOuverte.avertissement}
           onClose={() => setModaleOuverte(null)}
         />
+      )}
+
+      {ajoutOuvert && (
+        <ModaleAjoutOffre onClose={() => setAjoutOuvert(false)} onOffreAjoutee={handleOffreAjoutee} />
       )}
     </>
   )

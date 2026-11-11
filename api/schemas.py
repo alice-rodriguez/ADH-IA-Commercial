@@ -123,6 +123,31 @@ class NotesUpdate(BaseModel):
     notes: Optional[str] = None
 
 
+class OffreManuelleRequest(BaseModel):
+    """Body du POST /api/offres/manuelle : au moins l'un des deux non vide."""
+
+    url: Optional[str] = None
+    texte: Optional[str] = None
+
+
+class OffreManuelleResultat(BaseModel):
+    """Réponse du POST /api/offres/manuelle."""
+
+    id: int
+    titre: str
+    entreprise: Optional[str]
+    lieu: Optional[str]
+    type_contrat: Optional[str]
+    tjm_min: Optional[int]
+    tjm_max: Optional[int]
+    description: Optional[str]
+    url: Optional[str]
+    deja_presente: bool
+    structuration_reussie: bool
+    nb_matchings: int
+    offre: Offre
+
+
 class AnalyseIA(BaseModel):
     """Résultat d'une analyse IA pour un couple (CV, offre)."""
 

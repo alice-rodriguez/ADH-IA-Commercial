@@ -72,6 +72,45 @@ export interface CompteurCandidat {
   top: number
 }
 
+export interface OffreManuelleResultat {
+  id: number
+  titre: string
+  entreprise: string | null
+  lieu: string | null
+  type_contrat: string | null
+  tjm_min: number | null
+  tjm_max: number | null
+  description: string | null
+  url: string | null
+  deja_presente: boolean
+  structuration_reussie: boolean
+  nb_matchings: number
+  offre: Offre
+}
+
+export async function ajouterOffreManuelle(
+  saisie: { url: string | null; texte: string | null },
+): Promise<OffreManuelleResultat> {
+  const r = await fetch(`${API_BASE_URL}/api/offres/manuelle`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(saisie),
+    credentials: 'include',
+  })
+  if (!r.ok) {
+    // 422 : message destiné à Alice, transmis tel quel
+    let message = `Erreur POST /api/offres/manuelle : ${r.status}`
+    try {
+      const data = await r.json()
+      if (typeof data.detail === 'string') message = data.detail
+    } catch {
+      // corps non JSON : message générique
+    }
+    throw new Error(message)
+  }
+  return r.json()
+}
+
 export async function fetchCompteurs(scoreMin: number = 40): Promise<Record<number, CompteurCandidat>> {
   const r = await fetch(`${API_BASE_URL}/api/offres/compteurs-candidats?score_min=${scoreMin}`, { credentials: 'include' })
   if (!r.ok) throw new Error(`Erreur compteurs : ${r.status}`)

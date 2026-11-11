@@ -57,12 +57,13 @@ interface Props {
   offreId: number
   titreOffre: string
   entrepriseOffre?: string
+  avertissement?: string
   onClose: () => void
 }
 
 type AnalyseState = AnalyseIA | 'loading' | null
 
-export default function ModaleCandidats({ offreId, titreOffre, entrepriseOffre = '', onClose }: Props) {
+export default function ModaleCandidats({ offreId, titreOffre, entrepriseOffre = '', avertissement, onClose }: Props) {
   const [candidats, setCandidats] = useState<Candidat[]>([])
   const [loading, setLoading] = useState(true)
   const [seuilAffichage, setSeuilAffichage] = useState(30)
@@ -184,6 +185,12 @@ export default function ModaleCandidats({ offreId, titreOffre, entrepriseOffre =
             ✕
           </button>
         </div>
+
+        {avertissement && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+            ⚠️ {avertissement}
+          </div>
+        )}
 
         {/* Seuils */}
         <div className="flex items-center gap-2 mb-5">

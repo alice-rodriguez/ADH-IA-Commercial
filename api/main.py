@@ -71,6 +71,8 @@ from api.schemas import (
     NotesAdhUpdate,
     NotesUpdate,
     Offre,
+    OffreManuelleRequest,
+    OffreManuelleResultat,
     OffreMatch,
     PreviewCvRequest,
     ResetPasswordRequest,
@@ -228,6 +230,26 @@ def liste_offres():
         return get_offres_recentes(jours=30)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur base de données : {e}")
+
+
+@app.post("/api/offres/manuelle", response_model=OffreManuelleResultat)
+def ajouter_offre_manuelle(body: OffreManuelleRequest):
+    """Ajout manuel d'une annonce (texte collé ou lien) : ligne normale, source "Manuelle".
+
+    422 avec un message destiné à Alice si la saisie est vide ou la page illisible.
+    """
+    from src.offres_manuelles.importer import ImportManuelErreur, importer_offre_manuelle
+
+    try:
+        resultat = importer_offre_manuelle(body.url, body.texte)
+    except ImportManuelErreur as e:
+        raise HTTPException(422, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Erreur lors de l'ajout de l'annonce : {e}")
+    offre = get_offre_par_id(resultat["id"])
+    if offre is None:
+        raise HTTPException(500, "Offre introuvable après enregistrement")
+    return {**resultat, "offre": offre}
 
 
 @app.get("/api/offres/compteurs-candidats")

@@ -44,7 +44,8 @@ export function filtrer(
 
     if (f.statuts.length > 0 && !f.statuts.includes(o.statut)) return false
 
-    if (f.scoreMin !== null) {
+    // Une offre ajoutée à la main n'est jamais masquée par le score IA
+    if (f.scoreMin !== null && o.source !== 'Manuelle') {
       if (o.score_ia === null || o.score_ia < f.scoreMin) return false
     }
 
