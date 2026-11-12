@@ -364,13 +364,17 @@ def maj_notes_adh(cv_id: int, notes: dict) -> None:
 
 
 def compter_candidats_par_offre(score_min: int = 40) -> dict[int, int]:
-    """Retourne {offre_id: nb_candidats} pour les candidats avec score_global >= score_min."""
+    """Retourne {offre_id: nb_candidats} pour les candidats avec score_global >= score_min.
+
+    Un candidat positionné à la main (ajout_manuel = 1) est toujours compté.
+    """
+    migrer_matchings()
     with _connexion() as conn:
         rows = conn.execute(
             """
             SELECT offre_id, COUNT(*) as n
             FROM matchings
-            WHERE score_global >= ?
+            WHERE score_global >= ? OR COALESCE(ajout_manuel, 0) = 1
             GROUP BY offre_id
             """,
             (score_min,),
@@ -379,13 +383,15 @@ def compter_candidats_par_offre(score_min: int = 40) -> dict[int, int]:
 
 
 def get_top_score_par_offre(score_min: int = 40) -> dict[int, int]:
-    """Retourne {offre_id: meilleur_score} parmi les candidats >= score_min."""
+    """Retourne {offre_id: meilleur_score} parmi les candidats >= score_min,
+    candidats positionnés à la main compris (même règle que le compteur)."""
+    migrer_matchings()
     with _connexion() as conn:
         rows = conn.execute(
             """
             SELECT offre_id, MAX(score_global) as top
             FROM matchings
-            WHERE score_global >= ?
+            WHERE score_global >= ? OR COALESCE(ajout_manuel, 0) = 1
             GROUP BY offre_id
             """,
             (score_min,),
@@ -522,7 +528,12 @@ def supprimer_cv_cascade(cv_id: int) -> dict:
 
 
 def get_offres_par_cv(cv_id: int, score_min: int = 30) -> list[dict]:
-    """Retourne les offres matchées pour un CV, triées par score_global DESC, filtrées par score_min."""
+    """Retourne les offres matchées pour un CV, triées par score_global DESC, filtrées par score_min.
+
+    Une offre sur laquelle le CV est positionné à la main (ajout_manuel = 1)
+    est toujours renvoyée, quel que soit le seuil.
+    """
+    migrer_matchings()
     with _connexion() as conn:
         rows = conn.execute(
             """
@@ -541,12 +552,13 @@ def get_offres_par_cv(cv_id: int, score_min: int = 30) -> list[dict]:
                 m.score_experience,
                 m.score_contrat,
                 m.score_lieu,
-                m.details_json
+                m.details_json,
+                COALESCE(m.ajout_manuel, 0) AS ajout_manuel
             FROM matchings m
             JOIN offres o ON o.id = m.offre_id
-            WHERE m.cv_id = ? AND m.score_global >= ?
+            WHERE m.cv_id = ? AND (m.score_global >= ? OR COALESCE(m.ajout_manuel, 0) = 1)
             ORDER BY m.score_global DESC
             """,
             (cv_id, score_min),
         ).fetchall()
-    return [dict(r) for r in rows]
+    return [_candidat(r) for r in rows]

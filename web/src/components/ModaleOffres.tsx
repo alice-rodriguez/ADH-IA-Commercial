@@ -147,7 +147,8 @@ export default function ModaleOffres({ cvId, nomCandidat, onClose }: Props) {
     }
   }
 
-  const offresFiltrees = offres.filter((o) => o.score_global >= seuilAffichage)
+  // Une offre sur laquelle le candidat est positionné à la main est toujours affichée
+  const offresFiltrees = offres.filter((o) => o.ajout_manuel || o.score_global >= seuilAffichage)
 
   return (
     <>
@@ -227,6 +228,14 @@ export default function ModaleOffres({ cvId, nomCandidat, onClose }: Props) {
                           {o.score_global}%
                         </span>
                         <span className="font-semibold text-adh-black text-sm truncate">{o.titre}</span>
+                        {o.ajout_manuel && (
+                          <span
+                            className="inline-block px-1.5 py-0.5 bg-gray-100 text-gray-500 text-xs rounded shrink-0"
+                            title="Candidat positionné à la main sur cette offre"
+                          >
+                            ✋ ajouté à la main
+                          </span>
+                        )}
                       </div>
                       {o.entreprise && (
                         <p className="text-xs text-gray-500 mt-0.5">{o.entreprise}</p>

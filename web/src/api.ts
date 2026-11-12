@@ -378,6 +378,7 @@ export interface OffreMatch {
   score_contrat: number
   score_lieu: number
   details_json: string | null
+  ajout_manuel: boolean
 }
 
 export async function fetchOffresParCv(cvId: number, scoreMin: number = 30): Promise<OffreMatch[]> {

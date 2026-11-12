@@ -229,3 +229,4 @@ class OffreMatch(BaseModel):
     score_contrat: int
     score_lieu: int
     details_json: Optional[str] = None
+    ajout_manuel: bool = False

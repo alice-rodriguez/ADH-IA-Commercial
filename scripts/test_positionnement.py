@@ -15,6 +15,8 @@ ni IA. Vérifie et affiche :
   4. Affichage : un candidat positionné est renvoyé même au-delà de la limite
   5. Retrait : ajout_manuel repasse à 0, la ligne et l'analyse IA demeurent
   6. Endpoints POST / DELETE via le TestClient de FastAPI, 404 compris
+  7. MANUEL-02.bis : compteur de la carte offre et onglet « offres du
+     candidat » — un positionnement manuel passe toujours, quel que soit le seuil
 
 Usage (depuis la racine du dépôt) : python scripts/test_positionnement.py
 """
@@ -52,6 +54,7 @@ from src.storage import database                      # noqa: E402
 from src.matching import calculer                     # noqa: E402
 from src.matching.scoring import calculer_score_global  # noqa: E402
 
+REF_ANCIEN_CODE = "bba4353"   # dernier commit avant MANUEL-02 (INSERT OR REPLACE)
 COLS = "score_global, score_competences, score_domaine, score_experience, score_contrat, score_lieu, date_calcul, ajout_manuel"
 
 
@@ -175,11 +178,12 @@ def main():
     print(f"  => marques conservées : {marques_avant == marques_apres}")
     print(f"  ligne (offre {o_faible}, CV {cv_faible}) après recalcul : {ligne(o_faible, cv_faible)}")
 
-    # Contre-épreuve : l'ancien calculer.py (INSERT OR REPLACE), lu dans git
+    # Contre-épreuve : l'ancien calculer.py (INSERT OR REPLACE), lu dans git au
+    # dernier commit avant MANUEL-02
     try:
-        source = subprocess.run(["git", "show", "HEAD:src/matching/calculer.py"], cwd=ROOT,
+        source = subprocess.run(["git", "show", f"{REF_ANCIEN_CODE}:src/matching/calculer.py"], cwd=ROOT,
                                 capture_output=True, text=True, encoding="utf-8", check=True).stdout
-        if "INSERT OR REPLACE" in source:
+        if "INSERT OR REPLACE INTO matchings" in source:
             chemin = Path(tempfile.gettempdir()) / "calculer_ancien.py"
             chemin.write_text(source, encoding="utf-8")
             database.DB_PATH = copie_avant_recalcul
@@ -194,7 +198,7 @@ def main():
             print(f"  Contre-épreuve, ANCIEN code (INSERT OR REPLACE) sur une copie : "
                   f"{len(marques_avant)} positionnement(s) avant, {perdues} après")
         else:
-            print("  Contre-épreuve : HEAD n'utilise plus INSERT OR REPLACE (déjà corrigé), non rejouée")
+            print(f"  Contre-épreuve : {REF_ANCIEN_CODE} ne contient pas INSERT OR REPLACE, non rejouée")
     except Exception as e:
         print(f"  Contre-épreuve non rejouée : {e}")
     finally:
@@ -250,6 +254,23 @@ def main():
             corps = {k: corps[k] for k in ("cv_id", "nom_candidat", "score_global", "score_competences",
                                            "score_domaine", "score_experience", "ajout_manuel", "deja_presente")}
         print(f"  {lib:<28} -> {r.status_code} {corps}")
+
+    titre("7. MANUEL-02.bis — compteur de la carte et offres du candidat (seuil 30)")
+    # Couple au score 0 positionné à la main : (offre 2, CV tardif), via le POST ci-dessus
+    o7, cv7 = offre_ass, cv_tardif
+    print(f"  couple testé : offre {o7}, CV {cv7}, matching {ligne(o7, cv7)}")
+    for etat in ("positionné", "retiré"):
+        if etat == "retiré":
+            api_db.retirer_positionnement(o7, cv7)
+        compteurs = api_db.compter_candidats_par_offre(30)
+        tops = api_db.get_top_score_par_offre(30)
+        offres_cv = api_db.get_offres_par_cv(cv7, score_min=30)
+        r1 = client.get("/api/offres/compteurs-candidats?score_min=30").json()
+        r2 = client.get(f"/api/cvs/{cv7}/offres?score_min=30").json()
+        print(f"  [{etat}] compteur offre {o7} : fonction={compteurs.get(o7)} top={tops.get(o7)} ; "
+              f"API={r1.get(str(o7))}")
+        print(f"  [{etat}] offres du CV {cv7} (seuil 30) : fonction={[(o['offre_id'], o['score_global'], o['ajout_manuel']) for o in offres_cv]} ; "
+              f"API={[(o['offre_id'], o['score_global'], o['ajout_manuel']) for o in r2]}")
 
 
 if __name__ == "__main__":
