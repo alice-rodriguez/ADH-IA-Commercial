@@ -129,8 +129,9 @@
   /* ── CORPS : colonne gauche FLOTTANTE ─────────────────── */
   /* Une table (ou un flex/grid) à deux colonnes s'étend sur toutes les pages :
      la cellule gauche, vide après la page 1, laissait une bande grise.
-     Flottée, la colonne gauche n'occupe que la hauteur de son contenu (page 1) ;
-     la suite du contenu reprend toute la largeur dès qu'elle la dépasse. */
+     Flottée, la colonne gauche reste sur la page 1 ; pdf.py lui donne une hauteur
+     minimale (mesurée) pour que son pied touche la marge basse de la page 1 :
+     rien ne passe sous elle, et le contenu reprend toute la largeur dès la page 2. */
   .corps {
     margin: 8px 12mm 0 12mm;
   }
@@ -471,12 +472,12 @@
   {% endif %}
 </div>
 
-<!-- CORPS : colonne gauche flottante (page 1) + contenu pleine largeur ensuite -->
+<!-- CORPS : colonne gauche flottante pleine hauteur (page 1) + contenu pleine largeur ensuite -->
 <div class="corps">
 
     <!-- COLONNE GAUCHE (flottante) -->
     <div class="col-gauche-flottante">
-    <div class="col-gauche">
+    <div class="col-gauche"{% if hauteur_col_gauche_px %} style="min-height: {{ hauteur_col_gauche_px }}px"{% endif %}>
 
       <div class="section-titre">{{ labels.contact }}</div>
       <div class="contact-item">

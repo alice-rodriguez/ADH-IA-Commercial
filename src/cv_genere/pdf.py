@@ -112,7 +112,7 @@ def _generer_pdf_interne(
 
     env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)), autoescape=True)
     template = env.get_template("cv_adh.html")
-    html_str = template.render(
+    variables = dict(
         id_consultant=id_consultant,
         titre_consultant=cv.get("titre_courant", "Consultant IT"),
         annees_exp_label=annees_exp_label,
@@ -140,8 +140,58 @@ def _generer_pdf_interne(
         langue=langue,
     )
 
-    pdf_bytes = HTML(string=html_str, base_url=str(TEMPLATES_DIR)).write_pdf()
+    # Passe 1 : rendu sans hauteur imposée, pour mesurer où la colonne gauche
+    # commence sur la page 1 (dépend de la hauteur de l'encart candidature).
+    html_str = template.render(**variables, hauteur_col_gauche_px=None)
+    document = HTML(string=html_str, base_url=str(TEMPLATES_DIR)).render()
+    hauteur = _hauteur_col_gauche_page1_px(document)
+    if hauteur is not None:
+        # Passe 2 : la colonne gauche descend jusqu'à la marge basse de la page 1.
+        html_str = template.render(**variables, hauteur_col_gauche_px=hauteur)
+        document = HTML(string=html_str, base_url=str(TEMPLATES_DIR)).render()
+    pdf_bytes = document.write_pdf()
     return pdf_bytes, langue, titre_key_value
+
+
+# Marge de sécurité (px CSS) : évite qu'un arrondi ne fasse déborder la colonne
+# de quelques centièmes de mm sur la page 2, ce qui y créerait une bande vide.
+_MARGE_SECURITE_PX = 1.0
+
+
+def _hauteur_col_gauche_page1_px(document) -> float | None:
+    """Hauteur minimale de .col-gauche pour que son pied touche la marge basse de la page 1.
+
+    Mesurée dans l'arbre de mise en page de la passe 1 : bas de la zone de contenu
+    de la page 1 moins le haut de la bordure de .col-gauche. Renvoie None si la
+    mesure échoue, ou si la colonne déborde déjà sur la page 2 : elle garde alors
+    la hauteur de son contenu et continue en page 2, rien n'est tronqué (une
+    hauteur minimale sur une colonne coupée est réappliquée par WeasyPrint au
+    fragment de la page 2, qui resterait étroit sans raison).
+    """
+    try:
+        def chercher(boite):
+            el = getattr(boite, "element", None)
+            if el is not None and "col-gauche" in (el.get("class") or "").split():
+                return boite
+            for enfant in getattr(boite, "children", None) or []:
+                trouve = chercher(enfant)
+                if trouve is not None:
+                    return trouve
+            return None
+
+        page = document.pages[0]._page_box
+        colonne = chercher(page)
+        if colonne is None:
+            return None
+        if len(document.pages) > 1 and chercher(document.pages[1]._page_box) is not None:
+            logger.info("Colonne gauche plus haute que la page 1 : hauteur naturelle conservée")
+            return None
+        bas_page = page.content_box_y() + page.height
+        hauteur = bas_page - colonne.border_box_y() - _MARGE_SECURITE_PX
+        return round(hauteur, 2) if hauteur > 0 else None
+    except Exception:  # API interne WeasyPrint : repli sur la hauteur naturelle
+        logger.warning("Mesure de la colonne gauche impossible, hauteur naturelle conservée", exc_info=True)
+        return None
 
 
 def generer_pdf(cv_id: int, offre_id: int,
