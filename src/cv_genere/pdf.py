@@ -127,6 +127,9 @@ def _generer_pdf_interne(
         certifications=contenu.get("certifications") or [],
         secteurs=secteurs,
         langues=contenu.get("langues") or [],
+        # Rubrique DISPONIBILITÉ : champs de la fiche candidat, tels quels
+        disponibilite=(cv.get("disponibilite") or "").strip(),
+        mobilite=(cv.get("mobilite") or "").strip(),
         profil_final=profil_final,
         key_value_bullets=contenu.get("key_value_bullets") or [],
         titre_key_value=titre_key_value,

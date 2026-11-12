@@ -126,21 +126,27 @@
     margin-top: 2px;
   }
 
-  /* ── CORPS 2 COLONNES (table) ────────────────────────── */
+  /* ── CORPS : colonne gauche FLOTTANTE ─────────────────── */
+  /* Une table (ou un flex/grid) à deux colonnes s'étend sur toutes les pages :
+     la cellule gauche, vide après la page 1, laissait une bande grise.
+     Flottée, la colonne gauche n'occupe que la hauteur de son contenu (page 1) ;
+     la suite du contenu reprend toute la largeur dès qu'elle la dépasse. */
   .corps {
-    width: 186mm;
-    margin: 8px 12mm 4mm 12mm;
-    border-collapse: collapse;
-    table-layout: fixed;
+    margin: 8px 12mm 0 12mm;
+  }
+
+  .col-gauche-flottante {
+    float: left;
+    width: 74mm;            /* 70 mm de colonne + 4 mm de gouttière */
+    padding-right: 4mm;
+    background: #ffffff;    /* masque les filets des titres qui passent sous la colonne */
   }
 
   /* ── COLONNE GAUCHE ──────────────────────────────────── */
   .col-gauche {
-    width: 70mm;
     background: #fafafa;
     border: 1px solid #eeeeee;
     padding: 10px 10px;
-    vertical-align: top;
   }
 
   .section-titre {
@@ -234,10 +240,38 @@
     font-style: italic;
   }
 
-  /* ── COLONNE DROITE ──────────────────────────────────── */
-  .col-droite {
-    padding-left: 14px;
-    vertical-align: top;
+  .dispo-item {
+    font-size: 9pt;
+    color: #444444;
+    margin-bottom: 4px;
+    line-height: 1.35;
+  }
+
+  .dispo-item strong {
+    color: #000000;
+    display: block;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── COLONNE DROITE (contenu principal) ──────────────── */
+  /* Le texte s'écoule à droite de la colonne flottante sur la page 1, puis en
+     pleine largeur. Avec WeasyPrint, à côté d'un flottant :
+       - un bloc à contexte propre (flow-root, overflow, table) descend SOUS le
+         flottant, et un conteneur flex le CHEVAUCHE : aucun des deux n'est employé
+         dans le contenu principal ;
+       - une puce positionnée en absolu (left: 0) se dessinerait sur la colonne
+         gauche : les puces sont donc en ligne (inline-block + retrait négatif). */
+
+  /* Pied "N ans d'expérience" : jamais seul en tête d'une page supplémentaire */
+  .annees-exp {
+    font-size: 9pt;
+    color: #888888;
+    margin-top: 10px;
+    font-style: italic;
+    break-before: avoid;
+    page-break-before: avoid;
   }
 
   .section-droite-titre {
@@ -253,7 +287,7 @@
     page-break-after: avoid;
   }
 
-  .col-droite .section-droite-titre:first-child {
+  .col-droite > .section-droite-titre:first-child {
     margin-top: 0;
   }
 
@@ -284,23 +318,20 @@
   }
 
   .exp-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 12px;
     margin-bottom: 2px;
   }
 
   .exp-intitule {
     font-size: 11pt;
     font-weight: bold;
-    flex: 1;
   }
 
   .exp-dates {
+    float: right;
+    margin-left: 12px;
+    padding-top: 2px;
     font-size: 9pt;
     color: #888888;
-    flex-shrink: 0;
     white-space: nowrap;
   }
 
@@ -322,15 +353,16 @@
     font-size: 9pt;
     color: #444444;
     padding-left: 12px;
-    position: relative;
+    text-indent: -12px;
     margin-bottom: 3px;
     line-height: 1.4;
   }
 
   .exp-bullets li::before {
     content: "•";
-    position: absolute;
-    left: 0;
+    display: inline-block;
+    width: 12px;
+    text-indent: 0;
     color: #ff914d;
   }
 
@@ -338,12 +370,13 @@
     font-weight: bold;
     color: #ff914d;
     padding-left: 0;
+    text-indent: 0;
     margin-top: 6px;
     margin-bottom: 3px;
   }
 
   .exp-bullets .exp-bullet-titre::before {
-    content: "";
+    content: none;
   }
 
   /* ── POSTES (regroupement Earlier Career) ────────────── */
@@ -357,15 +390,16 @@
     font-size: 9pt;
     color: #444444;
     padding-left: 12px;
-    position: relative;
+    text-indent: -12px;
     margin-bottom: 2px;
     line-height: 1.35;
   }
 
   .exp-postes li::before {
     content: "•";
-    position: absolute;
-    left: 0;
+    display: inline-block;
+    width: 12px;
+    text-indent: 0;
     color: #ff914d;
   }
 
@@ -387,15 +421,16 @@
     font-size: 9.5pt;
     color: #333333;
     padding-left: 14px;
-    position: relative;
+    text-indent: -14px;
     margin-bottom: 5px;
     line-height: 1.4;
   }
 
   .key-value-liste li::before {
     content: "▸";
-    position: absolute;
-    left: 0;
+    display: inline-block;
+    width: 14px;
+    text-indent: 0;
     color: #ff914d;
     font-weight: bold;
   }
@@ -436,12 +471,12 @@
   {% endif %}
 </div>
 
-<!-- CORPS 2 COLONNES -->
-<table class="corps">
-  <tr>
+<!-- CORPS : colonne gauche flottante (page 1) + contenu pleine largeur ensuite -->
+<div class="corps">
 
-    <!-- COLONNE GAUCHE -->
-    <td class="col-gauche">
+    <!-- COLONNE GAUCHE (flottante) -->
+    <div class="col-gauche-flottante">
+    <div class="col-gauche">
 
       <div class="section-titre">{{ labels.contact }}</div>
       <div class="contact-item">
@@ -495,10 +530,24 @@
       {% endfor %}
       {% endif %}
 
-    </td>
+      {% if disponibilite or mobilite %}
+      <div class="section-titre">{{ labels.disponibilite }}</div>
+      {% if disponibilite %}
+      <div class="dispo-item">{{ disponibilite }}</div>
+      {% endif %}
+      {% if mobilite %}
+      <div class="dispo-item">
+        <strong>{{ labels.mobilite }}</strong>
+        {{ mobilite }}
+      </div>
+      {% endif %}
+      {% endif %}
 
-    <!-- COLONNE DROITE -->
-    <td class="col-droite">
+    </div>
+    </div>
+
+    <!-- CONTENU PRINCIPAL -->
+    <div class="col-droite">
 
       <div class="section-droite-titre">{{ labels.profil }}</div>
       <div class="profil-texte">{{ profil_final }}</div>
@@ -519,8 +568,8 @@
       {% for exp in experiences %}
       <div class="experience-item">
         <div class="exp-header">
-          <div class="exp-intitule" style="color: {{ '#ff914d' if exp.a_mettre_en_avant else '#000000' }}">{{ exp.intitule }}</div>
           <div class="exp-dates">{{ exp.dates }}</div>
+          <div class="exp-intitule" style="color: {{ '#ff914d' if exp.a_mettre_en_avant else '#000000' }}">{{ exp.intitule }}</div>
         </div>
         <div class="exp-entreprise">{{ exp.entreprise }}</div>
         {% if exp.postes %}
@@ -546,15 +595,12 @@
       {% endif %}
 
       {% if annees_exp_label %}
-      <p style="font-size:9pt; color:#888; margin-top:10px; font-style:italic;">
-        {{ annees_exp_label }}
-      </p>
+      <p class="annees-exp">{{ annees_exp_label }}</p>
       {% endif %}
 
-    </td>
+    </div>
 
-  </tr>
-</table>
+</div>
 
 </body>
 </html>
