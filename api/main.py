@@ -43,8 +43,11 @@ from api.database import (
     cv_existe,
     get_all_cvs,
     get_analyse_ia,
+    get_candidat_offre,
     get_candidats_par_offre,
     get_cv_par_id,
+    positionner_candidat,
+    retirer_positionnement,
     get_offre_par_id,
     get_offres_par_cv,
     get_offres_recentes,
@@ -74,6 +77,8 @@ from api.schemas import (
     OffreManuelleRequest,
     OffreManuelleResultat,
     OffreMatch,
+    PositionnementRequest,
+    PositionnementResultat,
     PreviewCvRequest,
     ResetPasswordRequest,
     StatutUpdate,
@@ -355,6 +360,46 @@ def candidats_pour_offre(offre_id: int, limit: int = 20):
         if not offre_existe(offre_id):
             raise HTTPException(404, f"Offre {offre_id} non trouvée")
         return get_candidats_par_offre(offre_id, limit=limit)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur base de données : {e}")
+
+
+@app.post("/api/offres/{offre_id}/candidats", response_model=PositionnementResultat)
+def positionner_candidat_endpoint(offre_id: int, body: PositionnementRequest):
+    """Positionne un candidat à la main sur l'offre (ajout_manuel = 1).
+
+    Matching existant : scores inchangés, seule la marque est posée. Sinon les
+    scores réels sont calculés. La ligne est toujours affichée et survit aux recalculs.
+    """
+    try:
+        if not offre_existe(offre_id):
+            raise HTTPException(404, f"Offre {offre_id} non trouvée")
+        if not cv_existe(body.cv_id):
+            raise HTTPException(404, f"CV {body.cv_id} non trouvé")
+        deja_presente = positionner_candidat(offre_id, body.cv_id)
+        ligne = get_candidat_offre(offre_id, body.cv_id)
+        if ligne is None:
+            raise HTTPException(500, "Matching introuvable après positionnement")
+        return {**ligne, "deja_presente": deja_presente}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur base de données : {e}")
+
+
+@app.delete("/api/offres/{offre_id}/candidats/{cv_id}")
+def retirer_positionnement_endpoint(offre_id: int, cv_id: int):
+    """Retire la marque d'ajout manuel. Le matching et les analyses IA restent."""
+    try:
+        if not offre_existe(offre_id):
+            raise HTTPException(404, f"Offre {offre_id} non trouvée")
+        if not cv_existe(cv_id):
+            raise HTTPException(404, f"CV {cv_id} non trouvé")
+        if not retirer_positionnement(offre_id, cv_id):
+            raise HTTPException(404, f"Aucun matching entre l'offre {offre_id} et le CV {cv_id}")
+        return {"offre_id": offre_id, "cv_id": cv_id, "ajout_manuel": False}
     except HTTPException:
         raise
     except Exception as e:

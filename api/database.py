@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.storage.database import DB_PATH, _connexion, migrer_cvs  # noqa: E402
+from src.storage.database import DB_PATH, _connexion, migrer_cvs, migrer_matchings  # noqa: E402
 
 
 def get_offres_recentes(jours: int = 30) -> list[dict]:
@@ -199,11 +199,7 @@ def maj_notes(offre_id: int, notes: Optional[str]) -> None:
 # ── Matching CVs ↔ Offres ────────────────────────────────────────────────────
 
 
-def get_candidats_par_offre(offre_id: int, limit: int = 20) -> list[dict]:
-    """Retourne les CVs matchés pour une offre, triés par score_global DESC."""
-    with _connexion() as conn:
-        rows = conn.execute(
-            """
+_SELECT_CANDIDAT = """
             SELECT
                 c.id            AS cv_id,
                 c.nom_fichier,
@@ -219,16 +215,99 @@ def get_candidats_par_offre(offre_id: int, limit: int = 20) -> list[dict]:
                 m.score_contrat,
                 m.score_lieu,
                 m.details_json,
-                m.date_calcul
+                m.date_calcul,
+                COALESCE(m.ajout_manuel, 0) AS ajout_manuel
             FROM matchings m
             JOIN cvs c ON c.id = m.cv_id
-            WHERE m.offre_id = ?
-            ORDER BY m.score_global DESC
-            LIMIT ?
-            """,
-            (offre_id, limit),
+"""
+
+
+def _candidat(row) -> dict:
+    d = dict(row)
+    d["ajout_manuel"] = bool(d.get("ajout_manuel"))
+    return d
+
+
+def get_candidats_par_offre(offre_id: int, limit: int = 20) -> list[dict]:
+    """Retourne les CVs matchés pour une offre, triés par score_global DESC.
+
+    Les `limit` meilleurs, PLUS tous les candidats positionnés à la main
+    (ajout_manuel = 1), même au-delà de la limite.
+    """
+    migrer_matchings()
+    with _connexion() as conn:
+        rows = conn.execute(
+            _SELECT_CANDIDAT + "WHERE m.offre_id = ? ORDER BY m.score_global DESC",
+            (offre_id,),
         ).fetchall()
-    return [dict(r) for r in rows]
+    return [_candidat(r) for i, r in enumerate(rows) if i < limit or r["ajout_manuel"]]
+
+
+def get_candidat_offre(offre_id: int, cv_id: int) -> dict | None:
+    """Ligne de matching complète d'un couple (offre, CV), ou None."""
+    migrer_matchings()
+    with _connexion() as conn:
+        row = conn.execute(
+            _SELECT_CANDIDAT + "WHERE m.offre_id = ? AND m.cv_id = ?",
+            (offre_id, cv_id),
+        ).fetchone()
+    return _candidat(row) if row else None
+
+
+def positionner_candidat(offre_id: int, cv_id: int) -> bool:
+    """Positionne un CV sur une offre à la main (ajout_manuel = 1).
+
+    Matching existant : seul ajout_manuel passe à 1, les scores ne sont pas
+    recalculés. Sinon : scores réels calculés avec calculer_score_global et
+    ligne insérée. Retourne deja_presente.
+    """
+    from src.matching.scoring import calculer_score_global
+
+    migrer_matchings()
+    with _connexion() as conn:
+        existe = conn.execute(
+            "SELECT 1 FROM matchings WHERE offre_id = ? AND cv_id = ?", (offre_id, cv_id)
+        ).fetchone()
+        if existe:
+            conn.execute(
+                "UPDATE matchings SET ajout_manuel = 1 WHERE offre_id = ? AND cv_id = ?",
+                (offre_id, cv_id),
+            )
+            return True
+        cv = dict(conn.execute("SELECT * FROM cvs WHERE id = ?", (cv_id,)).fetchone())
+        offre = dict(conn.execute("SELECT * FROM offres WHERE id = ?", (offre_id,)).fetchone())
+        scores = calculer_score_global(cv, offre)
+        conn.execute(
+            """
+            INSERT INTO matchings (
+                cv_id, offre_id,
+                score_global, score_competences, score_domaine,
+                score_experience, score_contrat, score_lieu,
+                details_json, date_calcul, ajout_manuel
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), 1)
+            """,
+            (
+                cv_id, offre_id,
+                scores["score_global"], scores["score_competences"], scores["score_domaine"],
+                scores["score_experience"], scores["score_contrat"], scores["score_lieu"],
+                scores["details_json"],
+            ),
+        )
+        return False
+
+
+def retirer_positionnement(offre_id: int, cv_id: int) -> bool:
+    """Repasse ajout_manuel à 0. La ligne de matching et les analyses IA restent.
+
+    Retourne False si aucun matching n'existe pour ce couple.
+    """
+    migrer_matchings()
+    with _connexion() as conn:
+        cur = conn.execute(
+            "UPDATE matchings SET ajout_manuel = 0 WHERE offre_id = ? AND cv_id = ?",
+            (offre_id, cv_id),
+        )
+        return cur.rowcount > 0
 
 
 def get_all_cvs() -> list[dict]:

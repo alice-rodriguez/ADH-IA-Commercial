@@ -96,6 +96,7 @@ def initialiser():
             logger.info("Migration : colonne offres.date_derniere_vue ajoutée "
                         "(initialisée à date_collecte)")
     migrer_cvs()
+    migrer_matchings()
     logger.info("Base de données prête : %s", DB_PATH)
 
 
@@ -111,6 +112,20 @@ def migrer_cvs():
         if colonnes and "nom_modifie_manuellement" not in colonnes:
             conn.execute("ALTER TABLE cvs ADD COLUMN nom_modifie_manuellement INTEGER DEFAULT 0")
             logger.info("Migration : colonne cvs.nom_modifie_manuellement ajoutée")
+
+
+def migrer_matchings():
+    """Migration idempotente de la table matchings (créée par scripts/init_matchings_table.py).
+
+    Ajoute ajout_manuel si absente : 1 = candidat positionné à la main par Alice
+    sur l'offre (toujours affiché, préservé par les recalculs).
+    Sans effet si la table matchings n'existe pas encore.
+    """
+    with _connexion() as conn:
+        colonnes = {row[1] for row in conn.execute("PRAGMA table_info(matchings)")}
+        if colonnes and "ajout_manuel" not in colonnes:
+            conn.execute("ALTER TABLE matchings ADD COLUMN ajout_manuel INTEGER DEFAULT 0")
+            logger.info("Migration : colonne matchings.ajout_manuel ajoutée")
 
 
 def _calculer_hash(titre: str, entreprise: str, source: str) -> str:

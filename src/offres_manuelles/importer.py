@@ -259,12 +259,24 @@ def calculer_matchings_offre(offre_id: int) -> int:
             scores = calculer_score_global(dict(cv_row), offre)
             conn.execute(
                 """
-                INSERT OR REPLACE INTO matchings (
+                INSERT INTO matchings (
                     cv_id, offre_id,
                     score_global, score_competences, score_domaine,
                     score_experience, score_contrat, score_lieu,
                     details_json, date_calcul
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                -- UPSERT et non INSERT OR REPLACE : REPLACE supprime la ligne avant
+                -- de la réinsérer, ce qui remettait ajout_manuel à 0 à chaque
+                -- recalcul. Ici seuls les scores sont réécrits.
+                ON CONFLICT(cv_id, offre_id) DO UPDATE SET
+                    score_global      = excluded.score_global,
+                    score_competences = excluded.score_competences,
+                    score_domaine     = excluded.score_domaine,
+                    score_experience  = excluded.score_experience,
+                    score_contrat     = excluded.score_contrat,
+                    score_lieu        = excluded.score_lieu,
+                    details_json      = excluded.details_json,
+                    date_calcul       = excluded.date_calcul
                 """,
                 (
                     cv_row["id"], offre_id,

@@ -178,6 +178,19 @@ class CandidatMatch(BaseModel):
     score_lieu: int
     details_json: Optional[str]
     date_calcul: Optional[str]
+    ajout_manuel: bool = False
+
+
+class PositionnementRequest(BaseModel):
+    """Body du POST /api/offres/{id}/candidats."""
+
+    cv_id: int
+
+
+class PositionnementResultat(CandidatMatch):
+    """Réponse du POST /api/offres/{id}/candidats : la ligne + deja_presente."""
+
+    deja_presente: bool
 
 
 class PreviewCvRequest(BaseModel):

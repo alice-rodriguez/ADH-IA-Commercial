@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AnalyseIA, Candidat, CV } from '../api'
-import { fetchAnalyseIA, fetchCVParId, fetchCandidats, getLangueCV, lancerAnalyseIA } from '../api'
+import {
+  fetchAnalyseIA,
+  fetchCVParId,
+  fetchCVs,
+  fetchCandidats,
+  getLangueCV,
+  lancerAnalyseIA,
+  positionnerCandidat,
+  retirerPositionnement,
+} from '../api'
 import EditeurNotesAdh from './EditeurNotesAdh'
 import ModalePreviewCV from './ModalePreviewCV'
 
@@ -73,6 +82,10 @@ export default function ModaleCandidats({ offreId, titreOffre, entrepriseOffre =
   const [analyseExpanded, setAnalyseExpanded] = useState<number | null>(null)
   const [previewCv, setPreviewCv] = useState<{ cvId: number; langueDetectee: 'fr' | 'en' } | null>(null)
   const [openingPreviewFor, setOpeningPreviewFor] = useState<number | null>(null)
+  const [positionnementOuvert, setPositionnementOuvert] = useState(false)
+  const [cvsProfiles, setCvsProfiles] = useState<CV[] | null>(null)
+  const [recherche, setRecherche] = useState('')
+  const [positionnementEnCours, setPositionnementEnCours] = useState<number | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
 
   async function fetchCVComplet(cvId: number) {
@@ -161,7 +174,58 @@ export default function ModaleCandidats({ offreId, titreOffre, entrepriseOffre =
     }
   }
 
-  const candidatsFiltres = candidats.filter((c) => c.score_global >= seuilAffichage)
+  // Un candidat positionné à la main est toujours affiché, quel que soit le seuil
+  const candidatsFiltres = candidats.filter((c) => c.ajout_manuel || c.score_global >= seuilAffichage)
+  const idsAffiches = new Set(candidatsFiltres.map((c) => c.cv_id))
+
+  function normaliser(s: string): string {
+    return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  }
+
+  const cvsProposes = (cvsProfiles ?? []).filter(
+    (cv) =>
+      !idsAffiches.has(cv.id) &&
+      normaliser(cv.nom_candidat ?? cv.nom_fichier).includes(normaliser(recherche.trim())),
+  )
+
+  async function ouvrirPositionnement() {
+    setPositionnementOuvert(true)
+    if (cvsProfiles === null) {
+      try {
+        const cvs = await fetchCVs()
+        setCvsProfiles(cvs.filter((cv) => cv.competences_techniques))
+      } catch (e) {
+        console.error(e)
+        setCvsProfiles([])
+        alert('Impossible de charger la liste des candidats')
+      }
+    }
+  }
+
+  async function handlePositionner(cvId: number) {
+    setPositionnementEnCours(cvId)
+    try {
+      const ligne: Candidat = await positionnerCandidat(offreId, cvId)
+      setCandidats((prev) =>
+        [...prev.filter((c) => c.cv_id !== cvId), ligne].sort((a, b) => b.score_global - a.score_global),
+      )
+      setRecherche('')
+      setPositionnementOuvert(false)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e))
+    } finally {
+      setPositionnementEnCours(null)
+    }
+  }
+
+  async function handleRetirer(cvId: number) {
+    try {
+      await retirerPositionnement(offreId, cvId)
+      setCandidats((prev) => prev.map((c) => (c.cv_id === cvId ? { ...c, ajout_manuel: false } : c)))
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e))
+    }
+  }
 
   return (
     <>
@@ -254,6 +318,14 @@ export default function ModaleCandidats({ offreId, titreOffre, entrepriseOffre =
                             🔗 Prospect
                           </span>
                         )}
+                        {c.ajout_manuel && (
+                          <span
+                            className="inline-block px-1.5 py-0.5 bg-gray-100 text-gray-500 text-xs rounded"
+                            title="Candidat positionné à la main sur cette offre"
+                          >
+                            ✋ ajouté à la main
+                          </span>
+                        )}
                       </div>
                       {c.titre_courant && (
                         <p className="text-xs text-gray-500 mt-0.5">{c.titre_courant}</p>
@@ -295,6 +367,15 @@ export default function ModaleCandidats({ offreId, titreOffre, entrepriseOffre =
                       >
                         👤 Profil ADH
                       </button>
+                      {c.ajout_manuel && (
+                        <button
+                          onClick={() => handleRetirer(c.cv_id)}
+                          className="text-xs text-gray-400 hover:text-red-600 border border-gray-200 rounded px-2 py-1 hover:border-red-300 transition-colors"
+                          title="Retirer le positionnement manuel (le matching et l'analyse IA sont conservés)"
+                        >
+                          Retirer
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -396,6 +477,62 @@ export default function ModaleCandidats({ offreId, titreOffre, entrepriseOffre =
                 </div>
               )
             })}
+          </div>
+        )}
+
+        {/* Positionnement manuel d'un candidat */}
+        {!loading && (
+          <div className="mt-5 pt-4 border-t border-gray-100">
+            {!positionnementOuvert ? (
+              <button
+                onClick={ouvrirPositionnement}
+                className="text-sm font-semibold text-adh-orange border border-adh-orange rounded px-3 py-1.5 hover:bg-adh-orange hover:text-white transition-colors"
+              >
+                + Positionner un candidat
+              </button>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={recherche}
+                    onChange={(e) => setRecherche(e.target.value)}
+                    placeholder="Rechercher un candidat par nom…"
+                    autoFocus
+                    className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-adh-orange"
+                  />
+                  <button
+                    onClick={() => { setPositionnementOuvert(false); setRecherche('') }}
+                    className="text-xs text-gray-500 hover:text-adh-black px-2 py-1"
+                  >
+                    Fermer
+                  </button>
+                </div>
+                {cvsProfiles === null ? (
+                  <p className="text-xs text-gray-400 py-2">Chargement des candidats…</p>
+                ) : cvsProposes.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-2">Aucun autre candidat profilé.</p>
+                ) : (
+                  <ul className="max-h-60 overflow-y-auto border border-gray-100 rounded divide-y divide-gray-100">
+                    {cvsProposes.map((cv) => (
+                      <li key={cv.id}>
+                        <button
+                          onClick={() => handlePositionner(cv.id)}
+                          disabled={positionnementEnCours !== null}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-orange-50 disabled:opacity-50 flex items-center justify-between gap-2"
+                        >
+                          <span>
+                            <span className="font-semibold text-adh-black">{cv.nom_candidat ?? cv.nom_fichier}</span>
+                            {cv.titre_courant && <span className="text-xs text-gray-500"> — {cv.titre_courant}</span>}
+                          </span>
+                          {positionnementEnCours === cv.id && <span className="text-xs animate-pulse">⏳</span>}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

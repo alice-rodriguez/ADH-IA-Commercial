@@ -65,6 +65,40 @@ export interface Candidat {
   score_lieu: number
   details_json: string | null
   date_calcul: string | null
+  ajout_manuel: boolean
+}
+
+export interface PositionnementResultat extends Candidat {
+  deja_presente: boolean
+}
+
+async function messageErreur(r: Response, defaut: string): Promise<string> {
+  try {
+    const data = await r.json()
+    if (typeof data.detail === 'string') return data.detail
+  } catch {
+    // corps non JSON
+  }
+  return defaut
+}
+
+export async function positionnerCandidat(offreId: number, cvId: number): Promise<PositionnementResultat> {
+  const r = await fetch(`${API_BASE_URL}/api/offres/${offreId}/candidats`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cv_id: cvId }),
+    credentials: 'include',
+  })
+  if (!r.ok) throw new Error(await messageErreur(r, `Erreur POST /candidats : ${r.status}`))
+  return r.json()
+}
+
+export async function retirerPositionnement(offreId: number, cvId: number): Promise<void> {
+  const r = await fetch(`${API_BASE_URL}/api/offres/${offreId}/candidats/${cvId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!r.ok) throw new Error(await messageErreur(r, `Erreur DELETE /candidats : ${r.status}`))
 }
 
 export interface CompteurCandidat {
