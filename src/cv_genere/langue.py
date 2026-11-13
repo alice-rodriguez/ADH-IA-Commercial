@@ -23,7 +23,6 @@ LABELS_FR: dict[str, str] = {
     "mobilite":         "Mobilité",
     "profil":           "Profil",
     "experiences":      "Expériences",
-    "annees_experience": "{n} ans d'expérience",
 }
 
 LABELS_EN: dict[str, str] = {
@@ -40,7 +39,6 @@ LABELS_EN: dict[str, str] = {
     "mobilite":         "Mobility",
     "profil":           "Profile",
     "experiences":      "Experiences",
-    "annees_experience": "{n} years of experience",
 }
 
 

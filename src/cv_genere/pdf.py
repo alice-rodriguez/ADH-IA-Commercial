@@ -101,11 +101,6 @@ def _generer_pdf_interne(
             domaines_cv = []
     secteurs = " · ".join(domaines_cv[:5]) if domaines_cv else ""
 
-    annees_experience = cv.get("annees_experience")
-    annees_exp_label = None
-    if annees_experience is not None:
-        annees_exp_label = labels["annees_experience"].replace("{n}", str(annees_experience))
-
     id_consultant = f"IDADH-{cv_id:03d}"
     picto_path = ASSETS_DIR / "picto-adh.png"
     logo_path = ASSETS_DIR / "logo-adh.png"
@@ -115,7 +110,6 @@ def _generer_pdf_interne(
     variables = dict(
         id_consultant=id_consultant,
         titre_consultant=cv.get("titre_courant", "Consultant IT"),
-        annees_exp_label=annees_exp_label,
         offre_titre=offre.get("titre", ""),
         offre_entreprise=offre.get("entreprise") or "",
         offre_lieu=offre.get("lieu") or "",
