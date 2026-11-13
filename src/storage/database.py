@@ -97,7 +97,49 @@ def initialiser():
                         "(initialisée à date_collecte)")
     migrer_cvs()
     migrer_matchings()
+    migrer_parametres()
     logger.info("Base de données prête : %s", DB_PATH)
+
+
+def migrer_parametres():
+    """Migration idempotente : crée la table parametres (clé → valeur) si absente.
+
+    Paramètres applicatifs modifiables depuis l'interface (ex. cv_instructions_defaut).
+    Stockés en base, et non dans un fichier de config, pour survivre à un git pull.
+    """
+    with _connexion() as conn:
+        existe = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'parametres'"
+        ).fetchone()
+        if not existe:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS parametres (
+                    cle    TEXT PRIMARY KEY,
+                    valeur TEXT
+                )
+            """)
+            logger.info("Migration : table parametres créée")
+
+
+def get_parametre(cle: str, defaut: str = "") -> str:
+    """Valeur d'un paramètre applicatif ; `defaut` s'il n'a jamais été enregistré."""
+    migrer_parametres()   # l'API ne passe pas par initialiser() : table garantie ici
+    with _connexion() as conn:
+        row = conn.execute("SELECT valeur FROM parametres WHERE cle = ?", (cle,)).fetchone()
+    if row is None or row["valeur"] is None:
+        return defaut
+    return row["valeur"]
+
+
+def set_parametre(cle: str, valeur: str) -> None:
+    """Enregistre (crée ou remplace) la valeur d'un paramètre applicatif."""
+    migrer_parametres()
+    with _connexion() as conn:
+        conn.execute(
+            "INSERT INTO parametres (cle, valeur) VALUES (?, ?) "
+            "ON CONFLICT(cle) DO UPDATE SET valeur = excluded.valeur",
+            (cle, valeur),
+        )
 
 
 def migrer_cvs():

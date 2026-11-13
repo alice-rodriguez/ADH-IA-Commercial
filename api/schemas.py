@@ -212,6 +212,12 @@ class ConfirmCvRequest(BaseModel):
     instructions: Optional[str] = None
 
 
+class InstructionsCvDefaut(BaseModel):
+    """GET / body du PUT /api/parametres/cv-instructions-defaut. Chaîne vide = aucun défaut."""
+
+    valeur: str = ""
+
+
 class OffreMatch(BaseModel):
     """Une offre matchée pour un CV."""
 

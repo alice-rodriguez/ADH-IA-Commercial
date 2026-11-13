@@ -534,6 +534,29 @@ export async function confirmCv(
   return r.json()
 }
 
+// ── Instructions de génération par défaut (paramètre persistant) ─────────────
+
+export async function fetchInstructionsDefaut(): Promise<string> {
+  const r = await fetch(`${API_BASE_URL}/api/parametres/cv-instructions-defaut`, {
+    credentials: 'include',
+  })
+  if (!r.ok) throw new Error(`Erreur GET instructions par défaut : ${r.status}`)
+  const data = (await r.json()) as { valeur?: string }
+  return data.valeur ?? ''
+}
+
+export async function saveInstructionsDefaut(valeur: string): Promise<string> {
+  const r = await fetch(`${API_BASE_URL}/api/parametres/cv-instructions-defaut`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ valeur }),
+    credentials: 'include',
+  })
+  if (!r.ok) throw new Error(`Erreur enregistrement instructions par défaut : ${r.status}`)
+  const data = (await r.json()) as { valeur?: string }
+  return data.valeur ?? ''
+}
+
 export async function cancelCvDraft(draftId: string): Promise<{ ok: boolean }> {
   const r = await fetch(`${API_BASE_URL}/api/cvs/preview-cv-drafts/${draftId}/cancel`, {
     method: 'POST',

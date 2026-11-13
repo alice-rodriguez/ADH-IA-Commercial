@@ -5,7 +5,9 @@ import {
   confirmCv,
   downloadFinalCv,
   fetchDraftPdf,
+  fetchInstructionsDefaut,
   previewCv,
+  saveInstructionsDefaut,
 } from '../api'
 
 const CONTACT_EMAIL_DEFAUT = 'contact@adhpmconsulting.com'
@@ -36,6 +38,11 @@ export default function ModalePreviewCV({ cvId, offreId, entrepriseOffre, langue
   )
   const [titreCustomise, setTitreCustomise] = useState(false)
   const [instructions, setInstructions] = useState('')
+  // Défaut enregistré en base : pré-remplit le champ ; les modifications du
+  // champ ne valent que pour cette génération tant qu'elles ne sont pas enregistrées.
+  const [instructionsDefaut, setInstructionsDefaut] = useState('')
+  const [defautMessage, setDefautMessage] = useState<{ texte: string; ok: boolean } | null>(null)
+  const [defautEnCours, setDefautEnCours] = useState(false)
 
   const overlayRef = useRef<HTMLDivElement>(null)
   // Refs pour accès dans les closures sans stale values
@@ -60,7 +67,9 @@ export default function ModalePreviewCV({ cvId, offreId, entrepriseOffre, langue
     }
   }
 
-  async function chargerDraft(ancienDraftId: string | null) {
+  // Les instructions sont passées explicitement : au montage, le défaut vient
+  // d'être lu et l'état React n'est pas encore à jour dans cette closure.
+  async function chargerDraft(ancienDraftId: string | null, instr: string = instructions) {
     setLoading(true)
     setError(null)
 
@@ -75,7 +84,7 @@ export default function ModalePreviewCV({ cvId, offreId, entrepriseOffre, langue
         contact_telephone: contactTelephone,
         langue,
         titre_key_value: titreKeyValue || undefined,
-        instructions: instructions || undefined,
+        instructions: instr || undefined,
       })
       setDraftId(resp.draft_id)
       draftIdRef.current = resp.draft_id
@@ -91,10 +100,19 @@ export default function ModalePreviewCV({ cvId, offreId, entrepriseOffre, langue
     }
   }
 
-  // Génération initiale au montage
+  // Montage : lecture du défaut enregistré, puis génération initiale avec lui
+  // (un échec de lecture n'empêche pas la génération : champ vide, comme avant).
   useEffect(() => {
-    chargerDraft(null)
+    let annule = false
+    ;(async () => {
+      const defaut = await fetchInstructionsDefaut().catch(() => '')
+      if (annule) return
+      setInstructionsDefaut(defaut)
+      setInstructions(defaut)
+      chargerDraft(null, defaut)
+    })()
     return () => {
+      annule = true
       revokeBlobUrl()
       if (draftIdRef.current) {
         cancelCvDraft(draftIdRef.current).catch(() => {})
@@ -102,6 +120,37 @@ export default function ModalePreviewCV({ cvId, offreId, entrepriseOffre, langue
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  function afficherMessageDefaut(texte: string, ok: boolean) {
+    setDefautMessage({ texte, ok })
+    window.setTimeout(() => setDefautMessage(null), 2500)
+  }
+
+  async function handleEnregistrerDefaut() {
+    setDefautEnCours(true)
+    try {
+      const valeur = await saveInstructionsDefaut(instructions)
+      setInstructionsDefaut(valeur)
+      afficherMessageDefaut('✓ Instructions par défaut enregistrées', true)
+    } catch (e) {
+      afficherMessageDefaut(e instanceof Error ? e.message : 'Erreur enregistrement', false)
+    } finally {
+      setDefautEnCours(false)
+    }
+  }
+
+  async function handleRetablirDefaut() {
+    setDefautEnCours(true)
+    try {
+      const valeur = await fetchInstructionsDefaut()
+      setInstructionsDefaut(valeur)
+      setInstructions(valeur)
+    } catch {
+      setInstructions(instructionsDefaut)   // repli : dernier défaut connu
+    } finally {
+      setDefautEnCours(false)
+    }
+  }
 
   async function handleRegenerer() {
     await chargerDraft(draftId)
@@ -272,6 +321,29 @@ export default function ModalePreviewCV({ cvId, offreId, entrepriseOffre, langue
                 placeholder="Ex : Mettre en avant la gestion budgétaire, ton plus formel…"
                 className={`${INPUT_CLASS} resize-none`}
               />
+              <div className="flex flex-col gap-1 mt-1">
+                <button
+                  type="button"
+                  onClick={handleEnregistrerDefaut}
+                  disabled={defautEnCours}
+                  className="text-xs text-left text-adh-orange hover:underline disabled:opacity-50"
+                >
+                  Enregistrer comme instructions par défaut
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRetablirDefaut}
+                  disabled={defautEnCours || instructions === instructionsDefaut}
+                  className="text-xs text-left text-gray-500 hover:underline disabled:opacity-50 disabled:no-underline"
+                >
+                  Rétablir le défaut
+                </button>
+                {defautMessage && (
+                  <p className={`text-xs ${defautMessage.ok ? 'text-green-700' : 'text-red-600'}`}>
+                    {defautMessage.texte}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Boutons */}

@@ -34,6 +34,7 @@ from src.auth.users import (
     list_users, reset_password, supprimer_user,
 )
 from src.auth.passwords import verify_password
+from src.storage.database import get_parametre, set_parametre
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +71,7 @@ from api.schemas import (
     ConfirmCvRequest,
     CreateUserRequest,
     FavoriUpdate,
+    InstructionsCvDefaut,
     LoginRequest,
     NotesAdhUpdate,
     NotesUpdate,
@@ -774,6 +776,24 @@ def cancel_draft_endpoint(draft_id: str):
     except Exception as e:
         logger.warning("Erreur suppression draft %s : %s", draft_id, e)
     return {"ok": True}
+
+
+# ── Paramètres : instructions de génération de CV par défaut ─────────────────
+
+CLE_CV_INSTRUCTIONS_DEFAUT = "cv_instructions_defaut"
+
+
+@app.get("/api/parametres/cv-instructions-defaut", response_model=InstructionsCvDefaut)
+def get_cv_instructions_defaut():
+    """Instructions pré-remplies dans la fenêtre de génération (chaîne vide si jamais enregistrées)."""
+    return InstructionsCvDefaut(valeur=get_parametre(CLE_CV_INSTRUCTIONS_DEFAUT, ""))
+
+
+@app.put("/api/parametres/cv-instructions-defaut", response_model=InstructionsCvDefaut)
+def put_cv_instructions_defaut(body: InstructionsCvDefaut):
+    """Remplace les instructions par défaut (chaîne vide = plus de défaut)."""
+    set_parametre(CLE_CV_INSTRUCTIONS_DEFAUT, body.valeur)
+    return InstructionsCvDefaut(valeur=get_parametre(CLE_CV_INSTRUCTIONS_DEFAUT, ""))
 
 
 @app.get("/api/cvs-generes/download")
