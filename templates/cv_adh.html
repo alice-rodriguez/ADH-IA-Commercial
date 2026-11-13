@@ -265,16 +265,6 @@
        - une puce positionnée en absolu (left: 0) se dessinerait sur la colonne
          gauche : les puces sont donc en ligne (inline-block + retrait négatif). */
 
-  /* Pied "N ans d'expérience" : jamais seul en tête d'une page supplémentaire */
-  .annees-exp {
-    font-size: 9pt;
-    color: #888888;
-    margin-top: 10px;
-    font-style: italic;
-    break-before: avoid;
-    page-break-before: avoid;
-  }
-
   .section-droite-titre {
     font-size: 12pt;
     font-weight: bold;
@@ -593,10 +583,6 @@
         {% endif %}
       </div>
       {% endfor %}
-      {% endif %}
-
-      {% if annees_exp_label %}
-      <p class="annees-exp">{{ annees_exp_label }}</p>
       {% endif %}
 
     </div>

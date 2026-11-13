@@ -31,7 +31,16 @@ RÈGLES ABSOLUES ANTI-HALLUCINATION :
 
 4. INTERDICTION ABSOLUE d'omettre un sous-projet présent dans le CV brut ou les notes_experiences.
    Si une expérience contient plusieurs sous-projets distincts (titres intermédiaires, paragraphes
-   séparés), tu DOIS TOUS les préserver dans description_bullets avec un en-tête **Sous-projet**."""
+   séparés), tu DOIS TOUS les préserver dans description_bullets avec un en-tête **Sous-projet**.
+
+5. L'ANNONCE ORIENTE, ELLE NE CRÉE JAMAIS DE CONTENU.
+   L'adaptation à l'offre porte sur la SÉLECTION et la FORMULATION, jamais sur les FAITS :
+   - l'offre décide quelles missions mettre en avant, dans quel ordre, quelles compétences
+     afficher en premier ;
+   - reprendre le vocabulaire de l'offre est souhaitable QUAND le CV source atteste la chose décrite ;
+   - aucun sigle, outil, logiciel, référentiel, norme ou méthode absent du CV brut et des
+     notes_experiences ne doit apparaître dans ta réponse, même s'il figure dans l'offre.
+     Avant d'écrire un terme technique, vérifie qu'il figure dans le CV brut ou les notes_experiences."""
 
 PROMPT_UTILISATEUR = """Tu dois produire un CV anonymisé et ciblé pour un cabinet de conseil en recrutement.
 
@@ -58,21 +67,32 @@ INSTRUCTIONS :
 2. PROFIL :
 {instruction_profil}
 
-3. KEY VALUE BULLETS (4 à 5 bullet points) :
-   Liste 4-5 points forts du consultant SPÉCIFIQUES À L'OFFRE CIBLE.
-   Format : phrases courtes et affirmatives (10-20 mots max chacune).
-   Source : tu peux paraphraser à partir du CV brut et des notes_experiences (si fournies).
-   TU NE PEUX PAS INVENTER de réalisations absentes du CV ou des notes_experiences.
+3. KEY VALUE BULLETS — POINTS FORTS (4 à 5 bullet points) :
+   Ce sont des FAITS tirés des EXPÉRIENCES, choisis en fonction de l'offre. PAS un résumé du profil.
+   - Chaque bullet s'appuie sur UNE mission précise de la section expériences (CV brut ou
+     notes_experiences), choisie pour sa proximité avec l'offre, et NOMME l'employeur ou le client
+     concerné (ex. : "Chez AG2R, ...").
+   - Il décrit ce qui a été FAIT dans cette mission (action, périmètre, résultat présents dans la
+     source), pas ce que le consultant "maîtrise" ou "connaît".
+   - Aucun bullet ne doit pouvoir être déduit du seul paragraphe de profil / résumé du CV.
+   - Aucun terme absent du CV brut et des notes_experiences (règle 5 du système).
+   - Privilégie des missions différentes d'un bullet à l'autre, en commençant par les plus proches
+     de l'offre.
+   Format : une phrase affirmative de 12 à 25 mots.
 
-4. COMPÉTENCES : sélectionne et ordonne les 6 compétences les plus pertinentes pour l'offre parmi celles du CV.
+4. COMPÉTENCES CLÉS (6) : le CONTENU vient du CV source, l'offre décide LESQUELLES et dans QUEL ORDRE.
+   - Chaque compétence est reprise du CV brut, des notes_experiences ou des compétences déclarées,
+     avec un libellé présent dans la source.
+   - Ordonne-les de la plus utile à la moins utile pour l'offre.
+   - Une compétence demandée par l'offre mais absente de la source n'apparaît PAS, même reformulée.
 
 5. EXPÉRIENCES À METTRE EN AVANT :
    Tu DOIS marquer entre 2 et 3 expériences avec "a_mettre_en_avant": true. PAS MOINS DE 2.
-   Choisis celles dont l'intitulé ou la description contient des mots-clés directement liés à l'offre cible.
-   Exemple pour une offre TRADING : marque les expériences contenant 'Trade', 'Finance', 'Trading',
-   'DOKA', 'Banking', 'Capital Markets' dans l'intitulé ou la description.
-   Si AUCUNE expérience ne semble parfaitement pertinente, marque quand même les 2 plus récentes
-   ou les 2 ayant le plus de mots-clés communs avec l'offre.
+   Choisis les missions les PLUS PROCHES DE L'OFFRE, jugées sur le fond : même métier ou rôle,
+   même secteur ou domaine fonctionnel, mêmes responsabilités et livrables que ceux décrits dans
+   l'offre — pas sur la simple présence d'un mot isolé, ni sur l'ancienneté.
+   Les missions sur lesquelles s'appuient les points forts sont en principe celles mises en avant.
+   Si aucune n'est vraiment proche, marque les 2 qui partagent le plus de responsabilités avec l'offre.
 
 6. REGROUPEMENT EARLIER CAREER :
    Si le CV brut contient une section regroupée (ex: 'EARLIER CAREER 2013-2018') avec plusieurs intitulés,
@@ -124,15 +144,15 @@ INSTRUCTIONS :
 
 LANGUE DE RÉDACTION :
 {langue_instruction}
-
+{bloc_instructions_operateur}
 Retourne UNIQUEMENT ce JSON (aucun texte avant ou après) :
 {{
   "profil": "Texte du profil OU null si profil_adh fourni",
   "key_value_bullets": [
-    "Point fort #1 spécifique à l'offre.",
-    "Point fort #2 spécifique à l'offre.",
-    "Point fort #3 spécifique à l'offre.",
-    "Point fort #4 spécifique à l'offre."
+    "Chez <employeur de la mission la plus proche de l'offre>, <ce qui a été fait, tiré de la source>.",
+    "Chez <employeur d'une autre mission proche>, <ce qui a été fait, tiré de la source>.",
+    "Chez <employeur>, <ce qui a été fait>.",
+    "Chez <employeur>, <ce qui a été fait>."
   ],
   "competences_top6_ordonnees": ["compétence1", "compétence2", "compétence3", "compétence4", "compétence5", "compétence6"],
   "experiences": [
@@ -183,6 +203,25 @@ _INSTRUCTION_PROFIL_SANS_ADH = (
     "   Si le CV brut n'a PAS de paragraphe initial de résumé, génère 3-4 lignes synthétiques\n"
     "   basées sur titre_courant + années + domaines (sans inventer de détails précis)."
 )
+
+
+def _bloc_instructions_operateur(instructions: str) -> str:
+    """Instructions de l'opérateur, placées en fin de prompt juste avant la demande de production.
+
+    Elles priment sur les consignes générales (rédaction, sélection, format) ; seule
+    l'interdiction d'inventer des faits reste au-dessus.
+    """
+    texte = (instructions or "").strip()
+    if not texte:
+        return ""
+    return (
+        "\n====== INSTRUCTIONS DE L'OPÉRATEUR (PRIORITAIRES) ======\n"
+        "Ces instructions PRIMENT sur toutes les consignes générales ci-dessus en cas de contradiction.\n"
+        "Applique-les dans leur esprit, pas seulement à la lettre. Seule limite : elles ne t'autorisent\n"
+        "jamais à inventer un fait ou un terme absent du CV source (règles absolues du système).\n\n"
+        f"{texte}\n"
+        "====== FIN DES INSTRUCTIONS DE L'OPÉRATEUR ======\n"
+    )
 
 
 def _strip_fences(text: str) -> str:
@@ -272,15 +311,8 @@ def reformuler_avec_haiku(cv_data: dict, offre_data: dict, langue: str = "fr", i
         offre_entreprise=offre_data.get("entreprise") or "Non précisé",
         offre_description=(offre_data.get("description") or "")[:2000],
         langue_instruction=langue_instruction,
+        bloc_instructions_operateur=_bloc_instructions_operateur(instructions_supplementaires),
     )
-
-    if instructions_supplementaires.strip():
-        prompt += (
-            "\n\nINSTRUCTIONS SUPPLÉMENTAIRES DE L'OPÉRATEUR (à respecter sauf contradiction "
-            "avec les règles anti-hallucination ci-dessus) :\n"
-            + instructions_supplementaires.strip()
-            + "\n"
-        )
 
     client = Anthropic(api_key=api_key)
     contenu = ""
