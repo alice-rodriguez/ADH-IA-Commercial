@@ -68,16 +68,18 @@ INSTRUCTIONS :
 {instruction_profil}
 
 3. KEY VALUE BULLETS — POINTS FORTS (4 à 5 bullet points) :
-   Ce sont des FAITS tirés des EXPÉRIENCES, choisis en fonction de l'offre. PAS un résumé du profil.
-   - Chaque bullet s'appuie sur UNE mission précise de la section expériences (CV brut ou
-     notes_experiences), choisie pour sa proximité avec l'offre, et NOMME l'employeur ou le client
-     concerné (ex. : "Chez AG2R, ...").
-   - Il décrit ce qui a été FAIT dans cette mission (action, périmètre, résultat présents dans la
-     source), pas ce que le consultant "maîtrise" ou "connaît".
+   Ce sont des COMPÉTENCES du consultant, rendues concrètes. PAS des missions, PAS un résumé du profil.
+   - Chaque bullet nomme UNE capacité du consultant et la rend concrète par sa substance technique
+     ou fonctionnelle : méthodes, outils, normes, livrables, domaines d'intervention, volumes —
+     puisés dans le DÉTAIL des expériences (CV brut ou notes_experiences), jamais dans le
+     paragraphe de profil / résumé du CV.
+   - AUCUN nom d'employeur ni de client dans cette rubrique : ils figurent déjà dans la section
+     expériences, juste en dessous.
    - Aucun bullet ne doit pouvoir être déduit du seul paragraphe de profil / résumé du CV.
-   - Aucun terme absent du CV brut et des notes_experiences (règle 5 du système).
-   - Privilégie des missions différentes d'un bullet à l'autre, en commençant par les plus proches
-     de l'offre.
+   - Aucun terme absent du CV brut et des notes_experiences, même s'il figure dans l'offre
+     (règle 5 du système).
+   - L'offre détermine LESQUELLES de ces compétences afficher et dans QUEL ORDRE : la plus utile
+     pour l'offre en premier.
    Format : une phrase affirmative de 12 à 25 mots.
 
 4. COMPÉTENCES CLÉS (6) : le CONTENU vient du CV source, l'offre décide LESQUELLES et dans QUEL ORDRE.
@@ -91,7 +93,7 @@ INSTRUCTIONS :
    Choisis les missions les PLUS PROCHES DE L'OFFRE, jugées sur le fond : même métier ou rôle,
    même secteur ou domaine fonctionnel, mêmes responsabilités et livrables que ceux décrits dans
    l'offre — pas sur la simple présence d'un mot isolé, ni sur l'ancienneté.
-   Les missions sur lesquelles s'appuient les points forts sont en principe celles mises en avant.
+   Les points forts puisent en priorité dans le détail de ces missions.
    Si aucune n'est vraiment proche, marque les 2 qui partagent le plus de responsabilités avec l'offre.
 
 6. REGROUPEMENT EARLIER CAREER :
@@ -149,10 +151,10 @@ Retourne UNIQUEMENT ce JSON (aucun texte avant ou après) :
 {{
   "profil": "Texte du profil OU null si profil_adh fourni",
   "key_value_bullets": [
-    "Chez <employeur de la mission la plus proche de l'offre>, <ce qui a été fait, tiré de la source>.",
-    "Chez <employeur d'une autre mission proche>, <ce qui a été fait, tiré de la source>.",
-    "Chez <employeur>, <ce qui a été fait>.",
-    "Chez <employeur>, <ce qui a été fait>."
+    "<Compétence la plus utile pour l'offre> : <méthodes, outils, normes, livrables ou volumes tirés du détail des expériences>.",
+    "<Compétence suivante> : <substance concrète tirée des expériences, sans nom d'employeur>.",
+    "<Compétence> : <substance concrète>.",
+    "<Compétence> : <substance concrète>."
   ],
   "competences_top6_ordonnees": ["compétence1", "compétence2", "compétence3", "compétence4", "compétence5", "compétence6"],
   "experiences": [
