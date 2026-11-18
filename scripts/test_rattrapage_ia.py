@@ -13,6 +13,8 @@ SIMULÉ (aucun appel réseau). Vérifie et affiche :
   6. Protection : 10 échecs consécutifs « crédit épuisé » → arrêt après 10 appels,
      cause nommée ; clé invalide reconnue ; des échecs non consécutifs n'arrêtent pas
   7. Bilan de fin de run du pipeline : échec explicite au lieu de « 0 retenues »
+  8. (bis) Tarifs Haiku 4.5 : coût réel et estimation calculés à $1 / $5 par million
+  9. (bis) Clé API absente : échec explicite (aucune offre retenue), comme l'IA injoignable
 
 Usage (depuis la racine du dépôt) : python scripts/test_rattrapage_ia.py
 """
@@ -266,6 +268,53 @@ def main():
     print(f"  IA injoignable : {panne}")
     verifier("échec explicite et cause nommée", "ÉCHEC FILTRE IA (crédit API Anthropic épuisé)" in panne
              and "→ 0 retenues" not in panne)
+
+    titre("8. (bis) Tarifs Haiku 4.5")
+    print(f"  TARIF_ENTREE = ${ai_filter.TARIF_ENTREE * 1e6:.2f} / M tokens, "
+          f"TARIF_SORTIE = ${ai_filter.TARIF_SORTIE * 1e6:.2f} / M tokens")
+    verifier("constantes à $1 / $5 par million de tokens",
+             abs(ai_filter.TARIF_ENTREE - 1e-6) < 1e-15 and abs(ai_filter.TARIF_SORTIE - 5e-6) < 1e-15)
+    regler(lambda n, p: 80)   # réponse simulée : 600 tokens en entrée, 100 en sortie
+    offre = ai_filter.analyser_offre({"titre": "Offre", "description": ""}, {}, FauxClient())
+    attendu = (600 * 1.00 + 100 * 5.00) / 1e6 * ai_filter.EUR_USD
+    ancien = (600 * 0.25 + 100 * 1.25) / 1e6 * ai_filter.EUR_USD
+    print(f"  coût d'un appel (600 / 100 tokens) : €{offre['cout_ia_eur']:.6f} "
+          f"(ancien calcul : €{ancien:.6f}, ×{offre['cout_ia_eur'] / ancien:.1f})")
+    verifier("coût réel d'un appel calculé au nouveau tarif", abs(offre["cout_ia_eur"] - attendu) < 1e-12)
+    estim = rattrapage_ia.cout_estime_par_offre()
+    attendu_estim = (575 * 1.00 + 150 * 5.00) / 1e6 * ai_filter.EUR_USD
+    print(f"  estimation du rattrapage par offre : €{estim:.6f} ; pour 466 offres : €{466 * estim:.4f}")
+    verifier("estimation du rattrapage au nouveau tarif", abs(estim - attendu_estim) < 1e-12)
+
+    titre("9. (bis) Clé API absente")
+    cle = os.environ.pop("ANTHROPIC_API_KEY")
+    try:
+        regler(lambda n, p: 80)
+        journal.clear()
+        rapport = {}
+        lot = [dict(o) for o in offres]
+        retenues, cout = ai_filter.filtrer(lot, {"seuils": {}}, rapport=rapport)
+        msg = [m for niv, m in journal if niv == "ERROR" and "FILTRE IA INTERROMPU" in m]
+        print(f"  filtrer() sans clé : {len(retenues)} retenue(s) sur {len(lot)}, {FauxClient.appels} appel(s), "
+              f"rapport = {rapport}")
+        print(f"  journal : {msg[0] if msg else '(aucun)'}")
+        verifier("aucune offre retenue (avant : toutes passaient sans score)", retenues == [] and cout == 0.0)
+        verifier("filtre interrompu, cause nommée, aucun appel",
+                 rapport["interrompu"] and "clé API Anthropic absente" in rapport["cause"] and FauxClient.appels == 0)
+        verifier("journal en ERROR avec renvoi vers le rattrapage",
+                 bool(msg) and "rattrapage_ia.py" in msg[0] and "12 offre(s)" in msg[0])
+        ligne = ligne_bilan({"collectees": 925, "dedup": 704, "passe1": 466, "passe2": 0}, 0.0, bilan_src, rapport)
+        print(f"  bilan : {ligne}")
+        verifier("bilan de fin de run en échec explicite",
+                 "ÉCHEC FILTRE IA (clé API Anthropic absente" in ligne and "rattrapage_ia.py" in ligne)
+        inserer("Chef de projet MOA banque sans clé", description=DESC_OK)
+        bilan, sortie = lancer()
+        print("  " + sortie.strip().replace("\n", "\n  "))
+        verifier("rattrapage sans clé : interrompu, cause nommée, aucun appel, rien d'écrit",
+                 bilan["interrompu"] and "clé API Anthropic absente" in bilan["cause"] and FauxClient.appels == 0
+                 and scores_en_base()["Chef de projet MOA banque sans clé"] is None)
+    finally:
+        os.environ["ANTHROPIC_API_KEY"] = cle
 
 
 if __name__ == "__main__":

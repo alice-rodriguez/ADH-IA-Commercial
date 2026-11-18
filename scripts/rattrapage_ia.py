@@ -116,8 +116,11 @@ def executer(jours: int, oui: bool, demander=input) -> dict:
         return bilan
 
     if not os.getenv("ANTHROPIC_API_KEY"):
-        print("ANTHROPIC_API_KEY n'est pas définie : aucun appel effectué.")
-        bilan["annule"] = True
+        # Même traitement que dans le filtre IA : échec explicite, cause nommée
+        bilan["interrompu"] = True
+        bilan["cause"] = "clé API Anthropic absente (ANTHROPIC_API_KEY non définie)"
+        print(f"⚠ RATTRAPAGE NON LANCÉ — {bilan['cause']}. Aucun appel effectué ; "
+              "définir la clé puis relancer la commande.")
         return bilan
 
     if not oui:

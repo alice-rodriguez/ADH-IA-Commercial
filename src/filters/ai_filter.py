@@ -2,11 +2,11 @@
 Passe 2 — Filtrage IA avec Claude Haiku (modèle le moins cher d'Anthropic).
 
 N'est appelée QUE sur les offres qui ont déjà passé le filtre mots-clés.
-Coût estimé : ~€0.001 par offre analysée (Claude Haiku).
+Coût estimé : ~€0.001 par offre analysée (Claude Haiku 4.5).
 
-Claude Haiku tarif (2025) :
-  - Entrée  : $0.25  / 1 million de tokens
-  - Sortie  : $1.25  / 1 million de tokens
+Tarif Claude Haiku 4.5 (voir TARIF_ENTREE / TARIF_SORTIE ci-dessous) :
+  - Entrée  : $1.00  / 1 million de tokens
+  - Sortie  : $5.00  / 1 million de tokens
 """
 
 import logging
@@ -18,8 +18,14 @@ import anthropic
 logger = logging.getLogger(__name__)
 
 MODELE = "claude-haiku-4-5-20251001"
-TARIF_ENTREE  = 0.25 / 1_000_000   # $ par token
-TARIF_SORTIE  = 1.25 / 1_000_000   # $ par token
+# Tarif API Anthropic de claude-haiku-4-5 (modèle MODELE ci-dessus), vérifié le
+# 18/11/2026 : $1 / $5 par million de tokens (entrée / sortie). À revérifier à
+# chaque changement de MODELE ou de grille tarifaire Anthropic : tous les coûts
+# affichés (bilan du pipeline, estimation et coût réel du rattrapage) en dépendent.
+# Les anciennes valeurs ($0.25 / $1.25, tarif d'un Haiku antérieur) sous-évaluaient
+# les coûts d'un facteur 4.
+TARIF_ENTREE  = 1.00 / 1_000_000   # $ par token
+TARIF_SORTIE  = 5.00 / 1_000_000   # $ par token
 EUR_USD       = 0.92                 # taux de conversion approximatif
 
 # Au-delà de ce nombre d'échecs CONSÉCUTIFS avec la même erreur (crédit épuisé,
@@ -175,8 +181,16 @@ def filtrer(offres: list, criteres: dict, rapport: dict | None = None,
 
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        logger.error("ANTHROPIC_API_KEY manquante — filtre IA désactivé")
-        return offres, 0.0
+        # Échec explicite, traité comme l'IA injoignable : AUCUNE offre retenue.
+        # (Avant : toutes les offres passaient, sans score — digest non filtré.)
+        rapport["interrompu"] = True
+        rapport["cause"] = "clé API Anthropic absente (ANTHROPIC_API_KEY non définie)"
+        logger.error(
+            "FILTRE IA INTERROMPU : %s. %d offre(s) non envoyée(s) à l'IA "
+            "(reprises par scripts/rattrapage_ia.py).",
+            rapport["cause"], len(offres),
+        )
+        return [], 0.0
 
     client = anthropic.Anthropic(api_key=api_key)
     seuil = criteres.get("seuils", {}).get("score_ia_minimum", 60)
