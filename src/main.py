@@ -174,6 +174,28 @@ def bilan_sources(resultats_sources: list) -> dict[str, list[str]]:
     return bilan
 
 
+def ligne_bilan(stats: dict, cout_ia: float, bilan: dict, rapport_ia: dict) -> str:
+    """Ligne de bilan de fin de run.
+
+    Filtre IA interrompu (IA injoignable) : échec explicite avec sa cause,
+    au lieu d'un « 0 retenues » indiscernable d'une journée sans offre.
+    """
+    if rapport_ia.get("interrompu"):
+        etape_ia = (
+            f"ÉCHEC FILTRE IA ({rapport_ia.get('cause')}) — {stats['passe2']} retenue(s), "
+            f"{rapport_ia.get('analysees', 0)} analysée(s) sur {stats['passe1']} ; "
+            "relancer scripts/rattrapage_ia.py une fois le problème corrigé"
+        )
+    else:
+        etape_ia = f"{stats['passe2']} retenues"
+    return (
+        f"Pipeline : {stats['collectees']} collectées → {stats['dedup']} après dédup → "
+        f"{stats['passe1']} pré-filtre → {etape_ia} — Coût IA : €{cout_ia:.4f}"
+        f" — {len(bilan['ok'])} source(s) OK / {len(bilan['partielles'])} partielle(s) / "
+        f"{len(bilan['echecs'])} en échec / {len(bilan['vides'])} à 0 offre"
+    )
+
+
 def dedupliquer_et_sauvegarder(offres: list, criteres: dict) -> tuple[list, int]:
     fenetre = criteres.get("seuils", {}).get("fenetre_deduplication_jours", 7)
     nouvelles, doublons = [], 0
@@ -247,7 +269,8 @@ def run():
 
     # ── 4. Passe 2 — Filtre IA ───────────────────────────────────────────────
     logger.info("\n── ÉTAPE 4 : Passe 2 — Filtre IA (Claude Haiku) ──")
-    offres_passe2, cout_ia = ai_filter.filtrer(offres_passe1, criteres)
+    rapport_ia: dict = {}
+    offres_passe2, cout_ia = ai_filter.filtrer(offres_passe1, criteres, rapport=rapport_ia)
     stats["passe2"] = len(offres_passe2)
 
     # Santé du run : une source en échec ou à 0 ne permet pas de conclure
@@ -260,12 +283,11 @@ def run():
             len(degradees), ", ".join(degradees),
         )
 
-    logger.info(
-        "\nPipeline : %d collectées → %d après dédup → %d pré-filtre → %d retenues — Coût IA : €%.4f"
-        " — %d source(s) OK / %d partielle(s) / %d en échec / %d à 0 offre",
-        stats["collectees"], stats["dedup"], stats["passe1"], stats["passe2"], cout_ia,
-        len(bilan["ok"]), len(bilan["partielles"]), len(bilan["echecs"]), len(bilan["vides"]),
-    )
+    ligne = ligne_bilan(stats, cout_ia, bilan, rapport_ia)
+    if rapport_ia.get("interrompu"):
+        logger.error("\n%s", ligne)
+    else:
+        logger.info("\n%s", ligne)
 
     # Mise à jour des scores IA dans la base
     for offre in offres_passe2:

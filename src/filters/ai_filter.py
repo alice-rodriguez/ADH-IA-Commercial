@@ -22,6 +22,29 @@ TARIF_ENTREE  = 0.25 / 1_000_000   # $ par token
 TARIF_SORTIE  = 1.25 / 1_000_000   # $ par token
 EUR_USD       = 0.92                 # taux de conversion approximatif
 
+# Au-delà de ce nombre d'échecs CONSÉCUTIFS avec la même erreur (crédit épuisé,
+# clé invalide…), l'IA est jugée injoignable : le filtre s'interrompt au lieu
+# de rejeter silencieusement toutes les offres restantes.
+SEUIL_ECHECS_CONSECUTIFS = 10
+
+
+def classer_erreur(e: Exception) -> tuple[str, str]:
+    """(signature, libellé lisible) d'une erreur d'appel à l'API Anthropic.
+
+    La signature sert à reconnaître « la même erreur » d'un appel à l'autre ;
+    elle ne contient pas le message brut (identifiant de requête variable).
+    """
+    message = str(e)
+    statut = getattr(e, "status_code", None)
+    if "credit balance" in message.lower():
+        return "credit", "crédit API Anthropic épuisé"
+    if isinstance(e, anthropic.AuthenticationError) or statut == 401:
+        return "cle", "clé API Anthropic invalide ou révoquée"
+    if isinstance(e, anthropic.PermissionDeniedError) or statut == 403:
+        return "permission", "accès refusé par l'API Anthropic (403)"
+    detail = f"{type(e).__name__}" + (f" ({statut})" if statut else "")
+    return f"autre:{type(e).__name__}:{statut}", f"autre erreur : {detail} — {message[:150]}"
+
 
 def analyser_offre(offre: dict, criteres: dict, client: anthropic.Anthropic) -> dict:
     """
@@ -124,17 +147,32 @@ Score 0-100 :
         offre["score_ia"] = 0
         offre["resume_ia"] = "Analyse impossible"
         offre["cout_ia_eur"] = 0.0
+        # L'appel n'a pas abouti : l'offre n'a PAS été analysée (≠ score 0 réel)
+        offre["erreur_ia"] = classer_erreur(e)
         return offre
 
 
-def filtrer(offres: list, criteres: dict) -> tuple[list, float]:
+def filtrer(offres: list, criteres: dict, rapport: dict | None = None,
+            a_chaque_offre=None) -> tuple[list, float]:
     """
     Applique le filtre IA sur toutes les offres passées en paramètre.
 
     Retourne :
       - La liste des offres retenues (score >= seuil)
       - Le coût total en euros
+
+    rapport (optionnel) : dict rempli avec "analysees", "echecs", "interrompu"
+      et "cause" (libellé lisible si le filtre s'est interrompu).
+    a_chaque_offre (optionnel) : appelée avec chaque offre juste après son
+      analyse (permet d'écrire le résultat au fil de l'eau).
+
+    Interruption : après SEUIL_ECHECS_CONSECUTIFS échecs consécutifs avec la
+    même erreur, les offres restantes ne sont pas envoyées à l'IA.
     """
+    if rapport is None:
+        rapport = {}
+    rapport.update({"analysees": 0, "echecs": 0, "interrompu": False, "cause": None})
+
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         logger.error("ANTHROPIC_API_KEY manquante — filtre IA désactivé")
@@ -145,10 +183,32 @@ def filtrer(offres: list, criteres: dict) -> tuple[list, float]:
 
     retenues = []
     cout_total = 0.0
+    signature_precedente, nb_consecutifs = None, 0
 
     for offre in offres:
         offre_analysee = analyser_offre(offre, criteres, client)
         cout_total += offre_analysee.get("cout_ia_eur", 0.0)
+        if a_chaque_offre is not None:
+            a_chaque_offre(offre_analysee)
+
+        erreur = offre_analysee.get("erreur_ia")
+        if erreur:
+            rapport["echecs"] += 1
+            signature, libelle = erreur
+            nb_consecutifs = nb_consecutifs + 1 if signature == signature_precedente else 1
+            signature_precedente = signature
+            if nb_consecutifs >= SEUIL_ECHECS_CONSECUTIFS:
+                rapport["interrompu"] = True
+                rapport["cause"] = libelle
+                logger.error(
+                    "FILTRE IA INTERROMPU : %d échecs consécutifs — %s. "
+                    "%d offre(s) non envoyée(s) à l'IA (reprises par scripts/rattrapage_ia.py).",
+                    nb_consecutifs, libelle, len(offres) - rapport["analysees"] - rapport["echecs"],
+                )
+                break
+            continue
+        signature_precedente, nb_consecutifs = None, 0
+        rapport["analysees"] += 1
 
         if offre_analysee.get("score_ia", 0) >= seuil:
             retenues.append(offre_analysee)
@@ -168,8 +228,9 @@ def filtrer(offres: list, criteres: dict) -> tuple[list, float]:
             )
 
     logger.info(
-        "Passe 2 (IA) : %d analysées → %d retenues — coût total : €%.4f",
-        len(offres), len(retenues), cout_total,
+        "Passe 2 (IA) : %d soumises, %d analysées, %d en échec → %d retenues — coût total : €%.4f%s",
+        len(offres), rapport["analysees"], rapport["echecs"], len(retenues), cout_total,
+        f" — INTERROMPU ({rapport['cause']})" if rapport["interrompu"] else "",
     )
 
     return retenues, cout_total
