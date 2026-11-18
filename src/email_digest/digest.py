@@ -6,6 +6,7 @@ Envoi   : Microsoft Graph API (OAuth2 client credentials) — compatible 2FA M36
 Prérequis Azure AD : application avec permission Mail.Send (Application) + admin consent.
 """
 
+import html
 import logging
 import os
 from datetime import datetime
@@ -102,6 +103,55 @@ def _bloc_pipeline(stats: dict, cout_ia: float) -> str:
     </div>"""
 
 
+COMMANDE_RATTRAPAGE = r"py scripts\rattrapage_ia.py --jours 7"
+
+
+def filtre_ia_interrompu(rapport_ia: dict | None) -> bool:
+    return bool(rapport_ia and rapport_ia.get("interrompu"))
+
+
+def nb_non_analysees(stats: dict, rapport_ia: dict | None) -> int:
+    """Offres passées au pré-filtre mais jamais analysées par l'IA (échecs compris)."""
+    return max(0, stats.get("passe1", 0) - (rapport_ia or {}).get("analysees", 0))
+
+
+def construire_objet(date_str: str, nb_retenues: int, rapport_ia: dict | None = None,
+                     mode_test: bool = False) -> str:
+    """Objet du mail. Filtre IA interrompu : ÉCHEC explicite, jamais « aucune nouvelle offre »."""
+    if filtre_ia_interrompu(rapport_ia):
+        objet = f"[ADH Veille] {date_str} — ÉCHEC — le filtre IA n'a pas pu s'exécuter"
+    elif nb_retenues == 0:
+        objet = f"[ADH Veille] {date_str} — aucune nouvelle offre"
+    else:
+        objet = f"[ADH Veille] {date_str} — {nb_retenues} nouvelle(s) offre(s)"
+    return "[TEST] " + objet if mode_test else objet
+
+
+def _bloc_echec_ia(stats: dict, rapport_ia: dict) -> str:
+    """Bandeau rouge en tête du mail quand le filtre IA a été interrompu."""
+    cause = html.escape(str(rapport_ia.get("cause") or "cause inconnue"))
+    non_analysees = nb_non_analysees(stats, rapport_ia)
+    analysees = rapport_ia.get("analysees", 0)
+    return f"""
+    <div style="background:#fdecea;border:2px solid #c0392b;border-left:1px solid #eee;border-right:1px solid #eee;padding:18px 32px;">
+      <div style="color:#c0392b;font-size:17px;font-weight:700;margin-bottom:8px;">
+        ⚠️ ÉCHEC — le filtre IA n'a pas pu s'exécuter
+      </div>
+      <div style="color:#333;font-size:14px;line-height:1.7;">
+        <b>Cause :</b> {cause}<br>
+        <b>Offres restées non analysées :</b> {non_analysees}
+        (sur {stats.get('passe1', 0)} passées au pré-filtre ; {analysees} analysée(s) avant l'arrêt)<br>
+        Ces offres sont enregistrées en base mais n'ont pas été évaluées : le résultat de ce digest est
+        <b>incomplet</b>, il ne signifie pas qu'il n'y avait aucune offre.
+      </div>
+      <div style="margin-top:10px;color:#333;font-size:14px;">
+        Une fois le problème corrigé, lancer le rattrapage depuis la racine du dépôt :<br>
+        <code style="display:inline-block;margin-top:4px;background:#fff;border:1px solid #e0b4ae;border-radius:4px;padding:4px 8px;color:#1a1a1a;">{html.escape(COMMANDE_RATTRAPAGE)}</code>
+        <span style="color:#777;font-size:12px;">(augmenter --jours pour couvrir toute la période de panne)</span>
+      </div>
+    </div>"""
+
+
 def _carte_offre(offre: dict, matchings: list) -> str:
     score = offre.get("score_ia", 0)
     couleur_score = "#2d6a4f" if score >= 80 else "#d4a017" if score >= 60 else "#c0392b"
@@ -179,6 +229,7 @@ def generer_html(
     cout_ia: float,
     resultats_sources: list,
     mode_test: bool = False,
+    rapport_ia: dict | None = None,
 ) -> str:
     """
     Génère le HTML complet de l'email digest.
@@ -189,6 +240,8 @@ def generer_html(
     cout_ia           : coût total en € du filtrage IA
     resultats_sources : [{nom, statut, count | erreur}]
     mode_test         : affiche la bannière jaune si True
+    rapport_ia        : rapport de ai_filter.filtrer ; s'il est « interrompu », bandeau
+                        d'échec (cause, offres non analysées, commande de rattrapage)
     """
     date_str = datetime.now().strftime("%A %d %B %Y").capitalize()
 
@@ -211,7 +264,19 @@ def generer_html(
         + _section_offres("Appels d'offres publics", ao, matchings_map, "🏛️")
     )
 
-    if not offres:
+    echec_ia = filtre_ia_interrompu(rapport_ia)
+    bloc_echec = _bloc_echec_ia(stats, rapport_ia) if echec_ia else ""
+
+    if not offres and echec_ia:
+        contenu_offres = (
+            '<div style="text-align:center;padding:40px;color:#c0392b;background:#fdf6f5;'
+            'border-radius:8px;border:1px dashed #e0b4ae;">'
+            '<div style="font-size:40px;margin-bottom:8px;">⚠️</div>'
+            '<p style="margin:0;font-size:15px;">Aucune offre n\'a pu être évaluée : '
+            "le filtre IA ne s'est pas exécuté (voir l'encadré ci-dessus).</p>"
+            "</div>"
+        )
+    elif not offres:
         contenu_offres = (
             '<div style="text-align:center;padding:40px;color:#999;background:#fafafa;'
             'border-radius:8px;border:1px dashed #ddd;">'
@@ -237,6 +302,9 @@ def generer_html(
     <div style="color:#fff;font-size:20px;font-weight:600;margin-top:12px;">Digest Opportunités</div>
     <div style="color:rgba(255,255,255,0.8);font-size:14px;margin-top:4px;">{date_str}</div>
   </div>
+
+  <!-- BANDEAU FILTRE IA INTERROMPU (vide si le filtre s'est exécuté normalement) -->
+  {bloc_echec}
 
   <!-- STATUT DES SOURCES -->
   {_section_statut_sources(resultats_sources)}

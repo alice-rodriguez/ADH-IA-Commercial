@@ -314,14 +314,8 @@ def run():
         logger.warning("Aucun destinataire configuré dans criteria.yaml > email > destinataires")
     else:
         date_str = datetime.now().strftime("%d/%m/%Y")
-        nb = stats["passe2"]
-        if nb == 0:
-            objet = f"[ADH Veille] {date_str} — aucune nouvelle offre"
-        else:
-            objet = f"[ADH Veille] {date_str} — {nb} nouvelle(s) offre(s)"
-
-        if mode_test:
-            objet = "[TEST] " + objet
+        # Filtre IA interrompu : objet en ÉCHEC, jamais « aucune nouvelle offre »
+        objet = digest.construire_objet(date_str, stats["passe2"], rapport_ia, mode_test)
 
         html = digest.generer_html(
             offres=offres_passe2,
@@ -330,6 +324,7 @@ def run():
             cout_ia=cout_ia,
             resultats_sources=resultats_sources,
             mode_test=mode_test,
+            rapport_ia=rapport_ia,
         )
         succes = digest.envoyer(html, destinataires, objet)
 

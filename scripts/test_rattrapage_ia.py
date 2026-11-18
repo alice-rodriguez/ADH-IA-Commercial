@@ -15,6 +15,8 @@ SIMULÉ (aucun appel réseau). Vérifie et affiche :
   7. Bilan de fin de run du pipeline : échec explicite au lieu de « 0 retenues »
   8. (bis) Tarifs Haiku 4.5 : coût réel et estimation calculés à $1 / $5 par million
   9. (bis) Clé API absente : échec explicite (aucune offre retenue), comme l'IA injoignable
+ 10. (ter) Mail quotidien : objet et corps en ÉCHEC si le filtre IA est interrompu
+     (cause du journal, offres non analysées, commande de rattrapage), run complet compris
 
 Usage (depuis la racine du dépôt) : python scripts/test_rattrapage_ia.py
 """
@@ -315,6 +317,100 @@ def main():
                  and scores_en_base()["Chef de projet MOA banque sans clé"] is None)
     finally:
         os.environ["ANTHROPIC_API_KEY"] = cle
+
+    titre("10. (ter) Mail quotidien")
+    from src.email_digest import digest
+    stats17 = {"collectees": 925, "dedup": 704, "passe1": 466, "passe2": 0}
+    sources = [{"nom": "Free-Work", "statut": "ok", "count": 925}]
+    date = "17/11/2026"
+
+    def rapport_de(comportement, nb=12, sans_cle=False):
+        """Rapport réellement produit par ai_filter.filtrer (même chaîne que le pipeline)."""
+        regler(comportement)
+        r = {}
+        sauvegarde = os.environ.pop("ANTHROPIC_API_KEY") if sans_cle else None
+        try:
+            ai_filter.filtrer([{"titre": f"O{i}", "description": ""} for i in range(nb)], {"seuils": {}}, rapport=r)
+        finally:
+            if sans_cle:
+                os.environ["ANTHROPIC_API_KEY"] = sauvegarde
+        return r
+
+    cas = {
+        "crédit épuisé": rapport_de(lambda n, p: ErreurCredit()),
+        "clé absente": rapport_de(lambda n, p: 80, sans_cle=True),
+        "clé invalide": rapport_de(lambda n, p: erreur_cle()),
+    }
+    for nom, rapport in cas.items():
+        objet = digest.construire_objet(date, 0, rapport)
+        corps = digest.generer_html([], {}, stats17, 0.0, sources, rapport_ia=rapport)
+        print(f"  [{nom}] objet : {objet}")
+        print(f"  [{nom}] cause dans le corps : {rapport['cause']!r}")
+        verifier(f"{nom} : objet en ÉCHEC, sans « aucune nouvelle offre »",
+                 "ÉCHEC — le filtre IA n'a pas pu s'exécuter" in objet and "aucune nouvelle offre" not in objet)
+        verifier(f"{nom} : cause du journal, 466 non analysées, commande de rattrapage",
+                 rapport["cause"] in corps and "Offres restées non analysées :</b> 466" in corps
+                 and r"py scripts\rattrapage_ia.py" in corps)
+        verifier(f"{nom} : le corps ne dit pas « Aucune nouvelle offre »",
+                 "Aucune nouvelle offre pertinente" not in corps and "Aucune offre n'a pu être évaluée" in corps)
+
+    # Interruption en cours de route : 2 offres retenues avant l'arrêt
+    regler(lambda n, p: 80 if n <= 2 else ErreurCredit())
+    partiel = {}
+    retenues, _ = ai_filter.filtrer([{"titre": f"Chef de projet {i}", "description": "", "type_contrat": "Freelance"}
+                                  for i in range(20)], {"seuils": {}}, rapport=partiel)
+    st = {"collectees": 30, "dedup": 25, "passe1": 20, "passe2": len(retenues)}
+    objet = digest.construire_objet(date, len(retenues), partiel)
+    corps = digest.generer_html(retenues, {}, st, 0.0, sources, rapport_ia=partiel)
+    print(f"  [interruption après 2 offres] objet : {objet}")
+    verifier("interruption partielle : objet en ÉCHEC, 2 offres affichées, 18 non analysées",
+             "ÉCHEC" in objet and corps.count("score IA") == 2
+             and "Offres restées non analysées :</b> 18" in corps)
+
+    # Run normal : inchangé
+    normal_objet = digest.construire_objet(date, 0, {"interrompu": False})
+    normal_corps = digest.generer_html([], {}, stats17, 0.0, sources, rapport_ia={"interrompu": False})
+    sans_rapport = digest.generer_html([], {}, stats17, 0.0, sources)
+    print(f"  [run normal] objet : {normal_objet}")
+    verifier("run normal sans offre : objet et corps inchangés, pas de bandeau d'échec",
+             normal_objet == "[ADH Veille] 17/11/2026 — aucune nouvelle offre"
+             and "Aucune nouvelle offre pertinente" in normal_corps and "ÉCHEC" not in normal_corps
+             and "n'a pas pu s'exécuter" not in normal_corps
+             and normal_corps == sans_rapport)
+    verifier("objets normaux et [TEST] inchangés",
+             digest.construire_objet(date, 3, None) == "[ADH Veille] 17/11/2026 — 3 nouvelle(s) offre(s)"
+             and digest.construire_objet(date, 0, cas["clé absente"], mode_test=True).startswith("[TEST] [ADH Veille]"))
+    piege = digest.generer_html([], {}, stats17, 0.0, sources,
+                                rapport_ia={"interrompu": True, "analysees": 0, "cause": "autre erreur : <script>"})
+    verifier("cause échappée en HTML", "<script>" not in piege and "&lt;script&gt;" in piege)
+
+    # Run complet du pipeline (src.main.run) : collecte simulée, clé absente, envoi intercepté
+    import src.main as pipeline
+    import src.cvs.scan as scan
+    envois = []
+    pipeline.collecter_en_parallele = lambda c, crit: (
+        [{"titre": "Chef de projet MOA banque run", "entreprise": "Banque X", "source": "Free-Work",
+          "lieu": "Paris", "type_contrat": "Freelance", "url": "https://example.com", "description": DESC_OK}],
+        [{"nom": "Free-Work", "statut": "ok", "count": 1}])
+    pipeline.construire_collecteurs = lambda cfg: []
+    pipeline.charger_tous_les_cvs = lambda: []
+    scan.scanner_dossier = lambda: {"ajouts": 0, "mises_a_jour": 0, "inchanges": 0, "profiles": 0}
+    pipeline.digest.envoyer = lambda html_, dest, objet: envois.append((objet, html_)) or False
+    cle = os.environ.pop("ANTHROPIC_API_KEY")
+    journal.clear()
+    try:
+        pipeline.run()
+    finally:
+        os.environ["ANTHROPIC_API_KEY"] = cle
+    bilan_run = [m for niv, m in journal if niv == "ERROR" and "Pipeline :" in m]
+    print(f"  [run complet] objet envoyé : {envois[0][0] if envois else '(aucun envoi)'}")
+    print(f"  [run complet] bilan : {bilan_run[0].strip() if bilan_run else '(aucun)'}")
+    verifier("run complet : un mail envoyé, objet en ÉCHEC, corps avec la cause et la commande",
+             len(envois) == 1 and "ÉCHEC — le filtre IA n'a pas pu s'exécuter" in envois[0][0]
+             and "clé API Anthropic absente" in envois[0][1] and "rattrapage_ia.py" in envois[0][1]
+             and "Offres restées non analysées :</b> 1" in envois[0][1])
+    verifier("run complet : bilan de fin de run en ERROR, ÉCHEC FILTRE IA",
+             bool(bilan_run) and "ÉCHEC FILTRE IA (clé API Anthropic absente" in bilan_run[0])
 
 
 if __name__ == "__main__":
