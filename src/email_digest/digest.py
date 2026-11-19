@@ -105,6 +105,18 @@ def _bloc_pipeline(stats: dict, cout_ia: float) -> str:
 
 COMMANDE_RATTRAPAGE = r"py scripts\rattrapage_ia.py --jours 7"
 
+# Noms français explicites : strftime("%A %B") dépend de la locale du système qui
+# exécute le pipeline (en anglais sur une machine ou un compte de service configuré en anglais).
+JOURS_FR = ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
+MOIS_FR = ("janvier", "février", "mars", "avril", "mai", "juin", "juillet",
+           "août", "septembre", "octobre", "novembre", "décembre")
+
+
+def date_longue_fr(d: datetime) -> str:
+    """« Mercredi 18 novembre 2026 » (« 1er » le premier du mois), quelle que soit la locale système."""
+    jour = "1er" if d.day == 1 else str(d.day)
+    return f"{JOURS_FR[d.weekday()].capitalize()} {jour} {MOIS_FR[d.month - 1]} {d.year}"
+
 
 def filtre_ia_interrompu(rapport_ia: dict | None) -> bool:
     return bool(rapport_ia and rapport_ia.get("interrompu"))
@@ -243,7 +255,7 @@ def generer_html(
     rapport_ia        : rapport de ai_filter.filtrer ; s'il est « interrompu », bandeau
                         d'échec (cause, offres non analysées, commande de rattrapage)
     """
-    date_str = datetime.now().strftime("%A %d %B %Y").capitalize()
+    date_str = date_longue_fr(datetime.now())
 
     banniere_test = ""
     if mode_test:
