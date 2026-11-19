@@ -295,6 +295,16 @@ def run():
         database.mettre_a_jour_ia(h, offre.get("resume_ia", ""), offre.get("score_ia", 0))
         offre["hash"] = h
 
+    # Offres périmées hors du digest : une offre revue après la fenêtre de
+    # déduplication repasse dans le pipeline avec sa date de collecte d'origine
+    # (au-delà de AGE_MAX_JOURS, elle est périmée même si elle est encore en ligne).
+    actifs = database.hashes_actifs([o["hash"] for o in offres_passe2])
+    perimees = [o for o in offres_passe2 if o["hash"] not in actifs]
+    if perimees:
+        logger.info("Digest : %d offre(s) périmée(s) écartée(s) (règle de fraîcheur)", len(perimees))
+        offres_passe2 = [o for o in offres_passe2 if o["hash"] in actifs]
+        stats["passe2"] = len(offres_passe2)
+
     # ── 5. Matching CV ───────────────────────────────────────────────────────
     logger.info("\n── ÉTAPE 5 : Matching CV ──")
     profils_cv = charger_tous_les_cvs()

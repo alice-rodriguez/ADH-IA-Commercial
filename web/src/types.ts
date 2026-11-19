@@ -19,4 +19,6 @@ export interface Offre {
   favori: boolean
   statut: string
   notes: string | null
+  /** Offre périmée (plus revue par sa source) : présente seulement si le filtre avancé l'a demandée */
+  perimee?: boolean
 }

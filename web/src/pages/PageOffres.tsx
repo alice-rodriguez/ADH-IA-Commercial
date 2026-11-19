@@ -22,15 +22,17 @@ export default function PageOffres() {
   } | null>(null)
   const [ajoutOuvert, setAjoutOuvert] = useState(false)
 
+  // Les offres périmées ne sont chargées que si le filtre avancé les demande
+  const afficherPerimees = filtres.afficherPerimees
   useEffect(() => {
-    Promise.all([fetchOffres(), fetchCompteurs(30)])
+    Promise.all([fetchOffres(afficherPerimees), fetchCompteurs(30, afficherPerimees)])
       .then(([offresData, compteursData]) => {
         setOffres(offresData)
         setCompteurs(compteursData)
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [afficherPerimees])
 
   const idsAvecMatching = useMemo(
     () => new Set(Object.keys(compteurs).map(Number)),

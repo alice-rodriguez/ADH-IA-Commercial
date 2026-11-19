@@ -232,9 +232,10 @@ def health():
 
 
 @app.get("/api/offres", response_model=list[Offre])
-def liste_offres():
+def liste_offres(inclure_perimees: bool = False):
+    """Offres non périmées ; inclure_perimees=true pour les afficher aussi (marquées "perimee")."""
     try:
-        return get_offres_recentes(jours=30)
+        return get_offres_recentes(inclure_perimees=inclure_perimees)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur base de données : {e}")
 
@@ -260,7 +261,7 @@ def ajouter_offre_manuelle(body: OffreManuelleRequest):
 
 
 @app.get("/api/offres/compteurs-candidats")
-def compteurs_candidats(score_min: int = 30):
+def compteurs_candidats(score_min: int = 30, inclure_perimees: bool = False):
     """Retourne {offre_id: {nb, top_score}} pour les badges sur les cartes.
 
     Format : {"1": {"nb": 2, "top": 59}, "5": {"nb": 1, "top": 47}, ...}
@@ -268,8 +269,8 @@ def compteurs_candidats(score_min: int = 30):
     try:
         if score_min < 0 or score_min > 100:
             raise HTTPException(422, "score_min doit être dans [0, 100]")
-        compteurs = compter_candidats_par_offre(score_min)
-        tops = get_top_score_par_offre(score_min)
+        compteurs = compter_candidats_par_offre(score_min, inclure_perimees=inclure_perimees)
+        tops = get_top_score_par_offre(score_min, inclure_perimees=inclure_perimees)
         return {
             offre_id: {"nb": nb, "top": tops.get(offre_id, 0)}
             for offre_id, nb in compteurs.items()
@@ -555,12 +556,12 @@ def langue_cv(cv_id: int):
 
 
 @app.get("/api/cvs/{cv_id}/offres", response_model=list[OffreMatch])
-def offres_pour_cv(cv_id: int, score_min: int = 30):
-    """Offres matchées pour un CV donné, triées par score_global DESC."""
+def offres_pour_cv(cv_id: int, score_min: int = 30, inclure_perimees: bool = False):
+    """Offres matchées pour un CV donné, triées par score_global DESC (offres périmées écartées)."""
     try:
         if not cv_existe(cv_id):
             raise HTTPException(404, f"CV {cv_id} non trouvé")
-        return get_offres_par_cv(cv_id, score_min=score_min)
+        return get_offres_par_cv(cv_id, score_min=score_min, inclure_perimees=inclure_perimees)
     except HTTPException:
         raise
     except Exception as e:

@@ -103,6 +103,9 @@ class Offre(BaseModel):
     favori: bool
     statut: str
     notes: Optional[str]
+    # Règle de fraîcheur (src/storage/database.py) : True seulement quand les
+    # offres périmées sont demandées explicitement (filtre avancé).
+    perimee: bool = False
 
 
 class FavoriUpdate(BaseModel):

@@ -17,6 +17,67 @@ logger = logging.getLogger(__name__)
 DB_PATH = Path(os.getenv("DB_PATH", "data/offers.db"))
 
 
+# ── Fraîcheur des offres ─────────────────────────────────────────────────────
+# Une offre n'est pas jugée sur son âge mais sur sa fraîcheur CONSTATÉE :
+# date_derniere_vue est mise à jour chaque fois qu'un collecteur la retrouve sur
+# son site. Une offre qui cesse d'être revue a disparu de sa source.
+#
+# Elle est PÉRIMÉE (masquée partout, jamais supprimée) si :
+#   - elle n'a pas été revue depuis plus de JOURS_SANS_REVUE_MAX jours : 21 jours
+#     et non quelques-uns, car une offre peut sortir de la profondeur de
+#     pagination d'un collecteur sans être retirée du site ;
+#   - OU elle a été collectée il y a plus de AGE_MAX_JOURS jours : au-delà, même
+#     revue, une mission est en pratique pourvue ou republiée sous une autre forme.
+# Exemption : les sources que AUCUN collecteur ne revisite (offres saisies à la
+# main) — leur date_derniere_vue ne bouge jamais, elles ne sont jamais périmées.
+JOURS_SANS_REVUE_MAX = 21
+AGE_MAX_JOURS = 60
+SOURCES_SANS_REVISITE = ("Manuelle",)
+
+
+def bornes_fraicheur(maintenant: datetime | None = None) -> tuple[str, str]:
+    """(revue_min, collecte_min) au format des dates stockées (isoformat local)."""
+    m = maintenant or datetime.now()
+    return ((m - timedelta(days=JOURS_SANS_REVUE_MAX)).isoformat(),
+            (m - timedelta(days=AGE_MAX_JOURS)).isoformat())
+
+
+def sql_offre_active(alias: str = "o") -> tuple[str, list]:
+    """Clause SQL « offre non périmée » pour la table offres aliasée `alias`, et ses paramètres."""
+    revue_min, collecte_min = bornes_fraicheur()
+    marques = ", ".join("?" for _ in SOURCES_SANS_REVISITE)
+    clause = (
+        f"({alias}.source IN ({marques}) OR ("
+        f"COALESCE({alias}.date_derniere_vue, {alias}.date_collecte) >= ? "
+        f"AND {alias}.date_collecte >= ?))"
+    )
+    return clause, [*SOURCES_SANS_REVISITE, revue_min, collecte_min]
+
+
+def est_perimee(offre: dict, maintenant: datetime | None = None) -> bool:
+    """Même règle que sql_offre_active, pour une offre déjà chargée (dict avec ses dates)."""
+    if offre.get("source") in SOURCES_SANS_REVISITE:
+        return False
+    revue_min, collecte_min = bornes_fraicheur(maintenant)
+    collecte = offre.get("date_collecte") or ""
+    revue = offre.get("date_derniere_vue") or collecte
+    return revue < revue_min or collecte < collecte_min
+
+
+def hashes_actifs(hashes: list[str]) -> set[str]:
+    """Parmi ces hash d'offres, ceux qui ne sont PAS périmés selon la base."""
+    if not hashes:
+        return set()
+    clause, params = sql_offre_active("o")
+    marques = ", ".join("?" for _ in hashes)
+    with _connexion() as conn:
+        rows = conn.execute(
+            f"SELECT o.hash FROM offres o WHERE o.hash IN ({marques}) AND {clause}",
+            [*hashes, *params],
+        ).fetchall()
+    return {r["hash"] for r in rows}
+
+
 def _connexion() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)

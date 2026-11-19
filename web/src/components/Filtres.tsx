@@ -320,6 +320,23 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees, nbAvec
               </div>
             </div>
 
+            {/* Offres périmées */}
+            <div>
+              <p className="text-xs font-bold uppercase text-gray-500 mb-1">Offres périmées</p>
+              <label
+                className="flex items-center gap-1.5 cursor-pointer"
+                title="Offres plus revues sur leur site depuis plus de 21 jours, ou collectées il y a plus de 60 jours"
+              >
+                <input
+                  type="checkbox"
+                  checked={filtres.afficherPerimees}
+                  onChange={() => onChange({ ...filtres, afficherPerimees: !filtres.afficherPerimees })}
+                  className="w-3.5 h-3.5 accent-[#ff914d]"
+                />
+                <span className="text-xs font-medium">Afficher les offres périmées</span>
+              </label>
+            </div>
+
             {/* Lieu */}
             <div>
               <p className="text-xs font-bold uppercase text-gray-500 mb-1">Lieu</p>

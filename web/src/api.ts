@@ -2,8 +2,9 @@ import type { Offre } from './types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-export async function fetchOffres(): Promise<Offre[]> {
-  const response = await fetch(`${API_BASE_URL}/api/offres`, { credentials: 'include' })
+export async function fetchOffres(inclurePerimees: boolean = false): Promise<Offre[]> {
+  const params = inclurePerimees ? '?inclure_perimees=true' : ''
+  const response = await fetch(`${API_BASE_URL}/api/offres${params}`, { credentials: 'include' })
   if (!response.ok) {
     throw new Error(`Erreur API ${response.status}: ${response.statusText}`)
   }
@@ -145,8 +146,12 @@ export async function ajouterOffreManuelle(
   return r.json()
 }
 
-export async function fetchCompteurs(scoreMin: number = 40): Promise<Record<number, CompteurCandidat>> {
-  const r = await fetch(`${API_BASE_URL}/api/offres/compteurs-candidats?score_min=${scoreMin}`, { credentials: 'include' })
+export async function fetchCompteurs(
+  scoreMin: number = 40,
+  inclurePerimees: boolean = false,
+): Promise<Record<number, CompteurCandidat>> {
+  const perimees = inclurePerimees ? '&inclure_perimees=true' : ''
+  const r = await fetch(`${API_BASE_URL}/api/offres/compteurs-candidats?score_min=${scoreMin}${perimees}`, { credentials: 'include' })
   if (!r.ok) throw new Error(`Erreur compteurs : ${r.status}`)
   const raw: Record<string, CompteurCandidat> = await r.json()
   return Object.fromEntries(Object.entries(raw).map(([k, v]) => [Number(k), v]))

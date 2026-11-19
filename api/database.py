@@ -15,18 +15,24 @@ logger = logging.getLogger(__name__)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.storage.database import DB_PATH, _connexion, migrer_cvs, migrer_matchings  # noqa: E402
+from src.storage.database import (  # noqa: E402
+    DB_PATH, _connexion, est_perimee, migrer_cvs, migrer_matchings, sql_offre_active,
+)
 
 
-def get_offres_recentes(jours: int = 30) -> list[dict]:
+def get_offres_recentes(inclure_perimees: bool = False) -> list[dict]:
     """
-    Retourne les offres collectées dans les N derniers jours.
+    Retourne les offres non périmées (règle de fraîcheur : src/storage/database.py,
+    JOURS_SANS_REVUE_MAX / AGE_MAX_JOURS ; offres « Manuelle » jamais périmées).
+    inclure_perimees=True : toutes les offres, chacune marquée "perimee".
 
     Inclut les données actions_utilisateur via LEFT JOIN.
     Offres sans entrée actions_utilisateur : vue=False, favori=False,
     statut='nouveau', notes=None.
     Tri : score_ia DESC NULLS LAST, puis date_collecte DESC.
     """
+    clause, params = sql_offre_active("o")
+    where = "" if inclure_perimees else f"WHERE {clause}"
     with _connexion() as conn:
         rows = conn.execute(
             """
@@ -47,22 +53,20 @@ def get_offres_recentes(jours: int = 30) -> list[dict]:
                 o.salaire_min,
                 o.salaire_max,
                 o.date_collecte,
+                o.date_derniere_vue,
                 COALESCE(a.vue, 0)            AS vue,
                 COALESCE(a.favori, 0)         AS favori,
                 COALESCE(a.statut, 'nouveau') AS statut,
                 a.notes                       AS notes
             FROM offres o
             LEFT JOIN actions_utilisateur a ON a.offre_id = o.id
-            -- Une offre "Manuelle" n'est jamais revue par un collecteur : elle
-            -- échappe à la fenêtre de fraîcheur, sinon elle disparaîtrait.
-            WHERE o.date_collecte >= datetime('now', '-' || ? || ' days')
-               OR o.source = 'Manuelle'
+            """ + where + """
             ORDER BY
                 o.score_ia IS NULL,
                 o.score_ia DESC,
                 o.date_collecte DESC
             """,
-            (jours,),
+            [] if inclure_perimees else params,
         ).fetchall()
 
     return [
@@ -70,6 +74,7 @@ def get_offres_recentes(jours: int = 30) -> list[dict]:
             **dict(row),
             "vue": bool(row["vue"]),
             "favori": bool(row["favori"]),
+            "perimee": est_perimee(dict(row)),
         }
         for row in rows
     ]
@@ -363,38 +368,51 @@ def maj_notes_adh(cv_id: int, notes: dict) -> None:
         conn.execute(f"UPDATE cvs SET {cols} WHERE id = ?", values)
 
 
-def compter_candidats_par_offre(score_min: int = 40) -> dict[int, int]:
+def _filtre_offres_actives(inclure_perimees: bool) -> tuple[str, list]:
+    """Jointure + condition qui écartent les matchings d'offres périmées (sauf si demandé)."""
+    if inclure_perimees:
+        return "", []
+    clause, params = sql_offre_active("o")
+    return f"JOIN offres o ON o.id = m.offre_id AND {clause}", params
+
+
+def compter_candidats_par_offre(score_min: int = 40, inclure_perimees: bool = False) -> dict[int, int]:
     """Retourne {offre_id: nb_candidats} pour les candidats avec score_global >= score_min.
 
     Un candidat positionné à la main (ajout_manuel = 1) est toujours compté.
+    Offres périmées ignorées, sauf inclure_perimees=True.
     """
     migrer_matchings()
+    jointure, params = _filtre_offres_actives(inclure_perimees)
     with _connexion() as conn:
         rows = conn.execute(
-            """
-            SELECT offre_id, COUNT(*) as n
-            FROM matchings
-            WHERE score_global >= ? OR COALESCE(ajout_manuel, 0) = 1
-            GROUP BY offre_id
+            f"""
+            SELECT m.offre_id AS offre_id, COUNT(*) as n
+            FROM matchings m
+            {jointure}
+            WHERE m.score_global >= ? OR COALESCE(m.ajout_manuel, 0) = 1
+            GROUP BY m.offre_id
             """,
-            (score_min,),
+            [*params, score_min],
         ).fetchall()
     return {r["offre_id"]: r["n"] for r in rows}
 
 
-def get_top_score_par_offre(score_min: int = 40) -> dict[int, int]:
+def get_top_score_par_offre(score_min: int = 40, inclure_perimees: bool = False) -> dict[int, int]:
     """Retourne {offre_id: meilleur_score} parmi les candidats >= score_min,
     candidats positionnés à la main compris (même règle que le compteur)."""
     migrer_matchings()
+    jointure, params = _filtre_offres_actives(inclure_perimees)
     with _connexion() as conn:
         rows = conn.execute(
-            """
-            SELECT offre_id, MAX(score_global) as top
-            FROM matchings
-            WHERE score_global >= ? OR COALESCE(ajout_manuel, 0) = 1
-            GROUP BY offre_id
+            f"""
+            SELECT m.offre_id AS offre_id, MAX(m.score_global) as top
+            FROM matchings m
+            {jointure}
+            WHERE m.score_global >= ? OR COALESCE(m.ajout_manuel, 0) = 1
+            GROUP BY m.offre_id
             """,
-            (score_min,),
+            [*params, score_min],
         ).fetchall()
     return {r["offre_id"]: r["top"] for r in rows}
 
@@ -527,13 +545,17 @@ def supprimer_cv_cascade(cv_id: int) -> dict:
     }
 
 
-def get_offres_par_cv(cv_id: int, score_min: int = 30) -> list[dict]:
+def get_offres_par_cv(cv_id: int, score_min: int = 30, inclure_perimees: bool = False) -> list[dict]:
     """Retourne les offres matchées pour un CV, triées par score_global DESC, filtrées par score_min.
 
     Une offre sur laquelle le CV est positionné à la main (ajout_manuel = 1)
-    est toujours renvoyée, quel que soit le seuil.
+    est toujours renvoyée, quel que soit le seuil. Les offres périmées sont
+    écartées (positionnements manuels compris), sauf inclure_perimees=True :
+    les anciens matchings restent en base mais ne remontent plus.
     """
     migrer_matchings()
+    clause, params = sql_offre_active("o")
+    condition = "" if inclure_perimees else f"AND {clause}"
     with _connexion() as conn:
         rows = conn.execute(
             """
@@ -557,8 +579,9 @@ def get_offres_par_cv(cv_id: int, score_min: int = 30) -> list[dict]:
             FROM matchings m
             JOIN offres o ON o.id = m.offre_id
             WHERE m.cv_id = ? AND (m.score_global >= ? OR COALESCE(m.ajout_manuel, 0) = 1)
+            """ + condition + """
             ORDER BY m.score_global DESC
             """,
-            (cv_id, score_min),
+            [cv_id, score_min, *([] if inclure_perimees else params)],
         ).fetchall()
     return [_candidat(r) for r in rows]

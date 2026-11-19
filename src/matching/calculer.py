@@ -10,14 +10,17 @@ import sys
 sys.path.insert(0, ".")
 
 from src.matching.scoring import calculer_score_global
-from src.storage.database import _connexion
+from src.storage.database import _connexion, sql_offre_active
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 
 def recalculer_pour_cv(cv_id: int) -> int:
-    """Recalcule les scores pour un CV donné contre toutes les offres < 30 j.
+    """Recalcule les scores pour un CV donné contre toutes les offres NON PÉRIMÉES
+    (règle de fraîcheur de src/storage/database.py ; offres « Manuelle » comprises).
+    Les matchings d'offres périmées ne sont plus recalculés ; ils restent en base
+    (historique) et sont masqués à l'affichage.
 
     Returns:
         Nombre de scores insérés/mis à jour.
@@ -33,12 +36,8 @@ def recalculer_pour_cv(cv_id: int) -> int:
             logger.info("  CV id=%d non profilé, skip.", cv_id)
             return 0
 
-        offres = conn.execute(
-            """
-            SELECT * FROM offres
-            WHERE date_collecte >= datetime('now', '-30 days')
-            """
-        ).fetchall()
+        clause, params = sql_offre_active("o")
+        offres = conn.execute(f"SELECT o.* FROM offres o WHERE {clause}", params).fetchall()
 
         count = 0
         for offre_row in offres:

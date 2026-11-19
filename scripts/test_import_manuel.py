@@ -192,7 +192,7 @@ def main():
                VALUES ('vieille-fw', 'Vieille offre Free-Work', 'Free-Work', '2026-01-01T09:00:00', '2026-01-01T09:00:00')"""
         )
     from api.database import get_offres_recentes, get_candidats_par_offre
-    ids = {o["id"]: o for o in get_offres_recentes(jours=30)}
+    ids = {o["id"]: o for o in get_offres_recentes()}
     vieille_fw = sqlite3.connect(DB).execute("SELECT id FROM offres WHERE hash = 'vieille-fw'").fetchone()[0]
     print(f"  Offre manuelle datée du 01/01 listée     : {r1['id'] in ids}")
     print(f"  Offre Free-Work datée du 01/01 listée    : {vieille_fw in ids}  (comportement inchangé)")

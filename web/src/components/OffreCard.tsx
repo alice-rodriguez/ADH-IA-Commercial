@@ -138,9 +138,19 @@ export default function OffreCard({ offre, onUpdate, compteur, onOuvrirCandidats
 
       {/* Ligne source + score + favori */}
       <div className="flex items-start justify-between gap-2">
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${sourceBadgeClass(offre.source)}`}>
-          {offre.source || 'Source inconnue'}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${sourceBadgeClass(offre.source)}`}>
+            {offre.source || 'Source inconnue'}
+          </span>
+          {offre.perimee && (
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600"
+              title="Plus revue sur son site depuis plus de 21 jours, ou collectée il y a plus de 60 jours"
+            >
+              Périmée
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {offre.score_ia !== null && (
             <span className={`text-2xl font-bold leading-none ${scoreColor(offre.score_ia)}`}>
