@@ -82,6 +82,7 @@ from api.schemas import (
     PositionnementRequest,
     PositionnementResultat,
     PreviewCvRequest,
+    RemplacementCvResultat,
     ResetPasswordRequest,
     StatutUpdate,
     UserOut,
@@ -527,6 +528,36 @@ async def upload_cv(file: UploadFile = File(...), est_prospect: bool = Query(Fal
         ) + "\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@app.post("/api/cvs/{cv_id}/remplacer-cv", response_model=RemplacementCvResultat)
+def remplacer_cv_endpoint(cv_id: int, file: UploadFile = File(...)):
+    """Remplace le PDF d'un candidat existant (même nom de fichier, pas de second candidat),
+    puis ré-extrait, re-profile et re-matche ce seul candidat. Saisies ADH préservées.
+
+    Échec du profilage : 200 avec profilage_reussi = false (le nouveau fichier est gardé).
+    """
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(400, "Seuls les fichiers PDF sont acceptés")
+    if file.content_type and "pdf" not in file.content_type.lower():
+        raise HTTPException(400, "Content-type incorrect (attendu : application/pdf)")
+    contenu = file.file.read()
+    if len(contenu) > 10 * 1024 * 1024:
+        raise HTTPException(413, "Fichier trop volumineux (max 10 MB)")
+    if not cv_existe(cv_id):
+        raise HTTPException(404, f"CV {cv_id} non trouvé")
+
+    from src.cvs.ajout import remplacer_cv
+
+    try:
+        resultat = remplacer_cv(cv_id, contenu)
+    except LookupError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(422, f"{e} — le CV actuel n'a pas été modifié.")
+    except Exception as e:
+        raise HTTPException(500, f"Erreur lors du remplacement du CV : {e}")
+    return {**resultat, "cv": get_cv_par_id(cv_id)}
 
 
 @app.get("/api/cvs/{cv_id}", response_model=CV)

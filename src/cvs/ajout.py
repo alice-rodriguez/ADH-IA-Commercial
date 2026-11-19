@@ -110,3 +110,95 @@ def profiler_un_cv(cv_id: int) -> dict:
 
     logger.info("CV profilé : id=%d → %s", cv_id, profil.get("nom_candidat"))
     return profil
+
+
+DOSSIER_CVS = Path("cvs")                       # même dossier que l'upload et le scan
+DOSSIER_ANCIENS = DOSSIER_CVS / "_remplaces"    # hors du glob cvs/*.pdf du scan
+
+
+def remplacer_cv(cv_id: int, contenu_pdf: bytes) -> dict:
+    """Remplace le PDF d'un candidat existant, puis ré-extrait, re-profile et re-matche CE candidat.
+
+    - Le fichier garde le nom existant du candidat (cvs/<nom_fichier>) : pas de second candidat.
+    - Le nouveau PDF est d'abord lu à part : s'il est illisible, rien n'est modifié.
+    - L'ancien PDF est conservé dans cvs/_remplaces/ (horodaté).
+    - Seules les colonnes extraites du CV changent (texte, puis profil). Les saisies ADH
+      (commentaires, postes ciblés, profil personnalisé, notes d'expériences, statut…)
+      ne sont jamais écrites ici ; le nom n'est pas écrasé si nom_modifie_manuellement = 1.
+    - Échec du profilage : signalé dans le résultat, le nouveau fichier et son texte restent.
+
+    Raises:
+        LookupError: candidat introuvable.
+        ValueError: PDF illisible ou texte trop court (aucune modification faite).
+    """
+    import shutil
+    import tempfile
+    from datetime import datetime
+
+    from src.cvs.extraction import extraire_texte_pdf
+    from src.matching.calculer import recalculer_pour_cv
+    from src.storage.database import _connexion, migrer_cvs
+
+    migrer_cvs()
+    with _connexion() as conn:
+        row = conn.execute("SELECT nom_fichier FROM cvs WHERE id = ?", (cv_id,)).fetchone()
+    if row is None:
+        raise LookupError(f"CV id={cv_id} introuvable en BDD")
+    nom_fichier = row["nom_fichier"]
+
+    # 1. Lecture du nouveau PDF AVANT de toucher à l'existant
+    fd, tmp = tempfile.mkstemp(suffix=".pdf")
+    try:
+        with open(fd, "wb") as f:
+            f.write(contenu_pdf)
+        try:
+            texte = extraire_texte_pdf(tmp)
+        except Exception as e:
+            raise ValueError(f"PDF illisible : {e}") from e
+    finally:
+        Path(tmp).unlink(missing_ok=True)
+    if len(texte) < 100:
+        raise ValueError(f"Texte extrait trop court ({len(texte)} car.) — PDF illisible ou vide")
+
+    # 2. Remplacement du fichier sous le MÊME nom (ancien PDF archivé)
+    DOSSIER_CVS.mkdir(exist_ok=True)
+    destination = DOSSIER_CVS / nom_fichier
+    ancien = None
+    if destination.exists():
+        DOSSIER_ANCIENS.mkdir(exist_ok=True)
+        ancien = DOSSIER_ANCIENS / f"{destination.stem}_{datetime.now():%Y%m%d-%H%M%S}{destination.suffix}"
+        shutil.copy2(destination, ancien)
+    destination.write_bytes(contenu_pdf)
+
+    # 3. Texte et date du fichier (le scan ne re-profilera pas une seconde fois)
+    with _connexion() as conn:
+        conn.execute(
+            """
+            UPDATE cvs SET texte_brut = ?, chemin_relatif = ?,
+                           date_modification_fichier = ?, date_dernier_scan = datetime('now')
+            WHERE id = ?
+            """,
+            (texte, str(destination).replace("\\", "/"), destination.stat().st_mtime, cv_id),
+        )
+    logger.info("CV remplacé : %s (id=%d, %d car.)", nom_fichier, cv_id, len(texte))
+
+    resultat = {"cv_id": cv_id, "nom_fichier": nom_fichier, "nb_caracteres": len(texte),
+                "ancien_fichier": str(ancien).replace("\\", "/") if ancien else None,
+                "profilage_reussi": False, "erreur_profilage": None,
+                "matching_reussi": False, "nb_matchings": 0}
+
+    # 4. Profilage de CE candidat (fonction existante)
+    try:
+        profiler_un_cv(cv_id)
+        resultat["profilage_reussi"] = True
+    except Exception as e:
+        logger.warning("Profilage échoué après remplacement du CV id=%d : %s", cv_id, e)
+        resultat["erreur_profilage"] = str(e)
+
+    # 5. Matching de CE candidat
+    try:
+        resultat["nb_matchings"] = recalculer_pour_cv(cv_id)
+        resultat["matching_reussi"] = True
+    except Exception as e:
+        logger.warning("Matching échoué après remplacement du CV id=%d : %s", cv_id, e)
+    return resultat

@@ -307,6 +307,29 @@ export interface SupprimerCvResult {
   nb_cvs_generes_supprimes: number
 }
 
+export interface RemplacementCvResultat {
+  cv: CV
+  profilage_reussi: boolean
+  erreur_profilage: string | null
+  matching_reussi: boolean
+  nb_matchings: number
+}
+
+export async function remplacerCv(cvId: number, fichier: File): Promise<RemplacementCvResultat> {
+  const form = new FormData()
+  form.append('file', fichier)
+  const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}/remplacer-cv`, {
+    method: 'POST',
+    body: form,
+    credentials: 'include',
+  })
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    throw new Error((data as { detail?: string }).detail || `Erreur ${r.status}`)
+  }
+  return r.json()
+}
+
 export async function supprimerCv(cvId: number): Promise<SupprimerCvResult> {
   const r = await fetch(`${API_BASE_URL}/api/cvs/${cvId}`, {
     method: 'DELETE',

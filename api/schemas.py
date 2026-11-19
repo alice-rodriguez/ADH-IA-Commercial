@@ -64,6 +64,16 @@ class CV(BaseModel):
     est_prospect: bool = False
 
 
+class RemplacementCvResultat(BaseModel):
+    """Réponse du POST /api/cvs/{id}/remplacer-cv."""
+
+    cv: CV
+    profilage_reussi: bool
+    erreur_profilage: Optional[str] = None
+    matching_reussi: bool
+    nb_matchings: int
+
+
 class NotesAdhUpdate(BaseModel):
     """Body du PATCH /api/cvs/{id}/notes-adh."""
 

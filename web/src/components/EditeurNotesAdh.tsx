@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CV, NotesAdhUpdate } from '../api'
-import { convertirEnConfirme, getLangueCV, patchNotesAdh, repasserEnProspect, supprimerCv } from '../api'
+import { convertirEnConfirme, getLangueCV, patchNotesAdh, remplacerCv, repasserEnProspect, supprimerCv } from '../api'
 
 type StatutRelation = 'actif' | 'en_pause' | 'place' | 'inactif'
 
@@ -44,7 +44,10 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onV
   const [repassing, setRepassing] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showConfirmSuppression, setShowConfirmSuppression] = useState(false)
+  const [remplacement, setRemplacement] = useState(false)
+  const [messageRemplacement, setMessageRemplacement] = useState<{ texte: string; ok: boolean } | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
+  const fichierRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     getLangueCV(cv.id).then(setLangueCV).catch((e) => console.error('Langue CV:', e))
@@ -155,6 +158,41 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onV
     }
   }
 
+  async function handleRemplacerCv(e: React.ChangeEvent<HTMLInputElement>) {
+    const fichier = e.target.files?.[0]
+    e.target.value = ''   // permet de redéposer le même fichier
+    if (!fichier) return
+    if (!fichier.name.toLowerCase().endsWith('.pdf')) {
+      setMessageRemplacement({ texte: 'Seuls les fichiers PDF sont acceptés.', ok: false })
+      return
+    }
+    setRemplacement(true)
+    setMessageRemplacement(null)
+    try {
+      const res = await remplacerCv(cv.id, fichier)
+      // Le profilage a pu mettre à jour le nom : la fiche reprend celui du serveur, sinon
+      // une sauvegarde renverrait l'ancien nom comme une correction manuelle.
+      setNomCandidat(res.cv.nom_candidat ?? '')
+      onSauvegarde(res.cv)
+      if (res.profilage_reussi) {
+        setMessageRemplacement({
+          texte: `✓ CV remplacé et re-profilé — ${res.nb_matchings} matching(s) recalculé(s). Vos saisies ADH sont conservées.`,
+          ok: true,
+        })
+      } else {
+        setMessageRemplacement({
+          texte: `CV remplacé (fichier et texte enregistrés), mais le profilage a échoué : ${res.erreur_profilage}. ` +
+            'Le profil précédent est conservé ; relancez le remplacement ou « py -m src.cvs.scan » plus tard.',
+          ok: false,
+        })
+      }
+    } catch (err) {
+      setMessageRemplacement({ texte: err instanceof Error ? err.message : 'Erreur lors du remplacement', ok: false })
+    } finally {
+      setRemplacement(false)
+    }
+  }
+
   function handleOverlayClick(e: React.MouseEvent<HTMLDivElement>) {
     if (e.target === overlayRef.current) onAnnuler()
   }
@@ -174,6 +212,26 @@ export default function EditeurNotesAdh({ cv, mode, onSauvegarde, onAnnuler, onV
             >
               🎯 Voir ses offres compatibles
             </button>
+          )}
+          <input
+            ref={fichierRef}
+            type="file"
+            accept="application/pdf,.pdf"
+            onChange={handleRemplacerCv}
+            className="hidden"
+          />
+          <button
+            onClick={() => fichierRef.current?.click()}
+            disabled={remplacement}
+            className="self-start text-xs text-gray-500 hover:text-adh-orange border border-gray-200 rounded px-2 py-1 hover:border-adh-orange transition-colors disabled:opacity-60"
+            title={`Remplace ${cv.nom_fichier} (même nom de fichier) puis relance l'extraction, le profilage et le matching`}
+          >
+            {remplacement ? '⏳ Remplacement et profilage en cours (10-20 s)…' : '📄 Remplacer le CV'}
+          </button>
+          {messageRemplacement && (
+            <p className={`text-xs max-w-md ${messageRemplacement.ok ? 'text-green-700' : 'text-red-600'}`}>
+              {messageRemplacement.texte}
+            </p>
           )}
         </div>
         {mode === 'modale' && (
