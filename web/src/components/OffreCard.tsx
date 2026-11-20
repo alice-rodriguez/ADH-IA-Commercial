@@ -42,6 +42,18 @@ function formatDate(iso: string): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+/** « Vue aujourd'hui », « Vue hier », « Vue il y a 3 j » (jours calendaires, heure locale). */
+function libelleFraicheur(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const d = new Date(iso.replace(' ', 'T'))
+  if (Number.isNaN(d.getTime())) return null
+  const jour = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const ecart = Math.round((jour(new Date()) - jour(d)) / 86_400_000)
+  if (ecart <= 0) return "Vue aujourd'hui"
+  if (ecart === 1) return 'Vue hier'
+  return `Vue il y a ${ecart} j`
+}
+
 function excerpt(offre: Offre): string {
   const text = offre.resume_ia || offre.description || 'Pas de description'
   return text.length > 200 ? text.slice(0, 200) + '…' : text
@@ -150,6 +162,14 @@ export default function OffreCard({ offre, onUpdate, compteur, onOuvrirCandidats
               Périmée
             </span>
           )}
+          {offre.hors_ligne && (
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700"
+              title="L'annonce n'existe plus sur son site (constaté par la vérification du pipeline)"
+            >
+              Plus en ligne
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {offre.score_ia !== null && (
@@ -197,7 +217,15 @@ export default function OffreCard({ offre, onUpdate, compteur, onOuvrirCandidats
         {offre.lieu && (
           <span className="text-gray-500">{offre.lieu}</span>
         )}
-        <span className="text-gray-400 ml-auto">{formatDate(offre.date_collecte)}</span>
+        <span className="text-gray-400 ml-auto" title="Date de collecte">{formatDate(offre.date_collecte)}</span>
+        {libelleFraicheur(offre.derniere_constatation) && (
+          <span
+            className="text-gray-400 text-xs"
+            title="Dernière fois que l'annonce a été vue en ligne (listes de la source ou vérification)"
+          >
+            · {libelleFraicheur(offre.derniere_constatation)}
+          </span>
+        )}
       </div>
 
       {/* Description */}

@@ -116,6 +116,10 @@ class Offre(BaseModel):
     # Règle de fraîcheur (src/storage/database.py) : True seulement quand les
     # offres périmées sont demandées explicitement (filtre avancé).
     perimee: bool = False
+    # FANTÔMES-01 : offre constatée hors ligne (masquée sauf filtre avancé)
+    hors_ligne: bool = False
+    # Dernière fois vue vivante (revue par un collecteur ou vérifiée en ligne) ; None pour « Manuelle »
+    derniere_constatation: Optional[str] = None
 
 
 class FavoriUpdate(BaseModel):

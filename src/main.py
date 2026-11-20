@@ -10,6 +10,7 @@ Orchestration du pipeline complet :
   5. Matching CV ↔ offres (TF-IDF, gratuit)
   6. Envoi du digest email (Microsoft Graph API)
   7. Recalcul des matchings CV ↔ offres pour l'interface web
+  8. Vérification que les offres à risque sont encore en ligne
 
 Variable d'environnement MODE_TEST=true : injecte 2 offres fictives
 pour valider le pipeline sans attendre de vraies offres.
@@ -211,6 +212,9 @@ def dedupliquer_et_sauvegarder(offres: list, criteres: dict) -> tuple[list, int]
 
 def run():
     mode_test = os.getenv("MODE_TEST", "false").lower() == "true"
+    # Les offres revues par les collecteurs à partir de cet instant sont vivantes
+    # par construction : l'étape 8 ne les interroge pas.
+    debut_run = datetime.now().isoformat()
 
     logger.info("=" * 60)
     logger.info(
@@ -355,6 +359,16 @@ def run():
         )
     except Exception as e:
         logger.error("Recalcul des matchings en échec (pipeline poursuivi) : %s", e)
+
+    # ── 8. Offres encore en ligne ? ──────────────────────────────────────────
+    # Offres à risque seulement (Free-Work / HelloWork, retenues ou positionnées,
+    # pas revues pendant ce run). Un échec ici ne fait jamais échouer le pipeline.
+    logger.info("\n── ÉTAPE 8 : Vérification des offres en ligne ──")
+    try:
+        from src.verification.en_ligne import verifier_offres
+        verifier_offres(debut_run, score_min=criteres.get("seuils", {}).get("score_ia_minimum", 60))
+    except Exception as e:
+        logger.error("Vérification en ligne en échec (pipeline poursuivi) : %s", e)
 
     logger.info("\n" + "=" * 60)
     logger.info("Agent ADH — terminé. Coût total IA : €%.4f", cout_ia)

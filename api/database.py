@@ -16,8 +16,22 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.storage.database import (  # noqa: E402
-    DB_PATH, _connexion, est_perimee, migrer_cvs, migrer_matchings, sql_offre_active,
+    DB_PATH, _connexion, derniere_constatation, est_hors_ligne, est_perimee, migrer_cvs,
+    migrer_matchings, migrer_offres_en_ligne, sql_offre_active,
 )
+
+
+def _enrichir_offre(row) -> dict:
+    """Offre pour l'interface : booléens, drapeaux de masquage et fraîcheur constatée."""
+    d = dict(row)
+    return {
+        **d,
+        "vue": bool(d["vue"]),
+        "favori": bool(d["favori"]),
+        "perimee": est_perimee(d),
+        "hors_ligne": est_hors_ligne(d),
+        "derniere_constatation": derniere_constatation(d),
+    }
 
 
 def get_offres_recentes(inclure_perimees: bool = False) -> list[dict]:
@@ -54,6 +68,8 @@ def get_offres_recentes(inclure_perimees: bool = False) -> list[dict]:
                 o.salaire_max,
                 o.date_collecte,
                 o.date_derniere_vue,
+                o.statut_en_ligne,
+                o.date_verification,
                 COALESCE(a.vue, 0)            AS vue,
                 COALESCE(a.favori, 0)         AS favori,
                 COALESCE(a.statut, 'nouveau') AS statut,
@@ -69,15 +85,7 @@ def get_offres_recentes(inclure_perimees: bool = False) -> list[dict]:
             [] if inclure_perimees else params,
         ).fetchall()
 
-    return [
-        {
-            **dict(row),
-            "vue": bool(row["vue"]),
-            "favori": bool(row["favori"]),
-            "perimee": est_perimee(dict(row)),
-        }
-        for row in rows
-    ]
+    return [_enrichir_offre(row) for row in rows]
 
 
 _SELECT_OFFRE = """
@@ -98,6 +106,9 @@ _SELECT_OFFRE = """
         o.salaire_min,
         o.salaire_max,
         o.date_collecte,
+        o.date_derniere_vue,
+        o.statut_en_ligne,
+        o.date_verification,
         COALESCE(a.vue, 0)            AS vue,
         COALESCE(a.favori, 0)         AS favori,
         COALESCE(a.statut, 'nouveau') AS statut,
@@ -113,6 +124,7 @@ def get_offre_par_id(offre_id: int) -> dict | None:
     Retourne None si l'offre n'existe pas.
     Pas de filtre temporel — accessible même si > 30 jours.
     """
+    migrer_offres_en_ligne()
     with _connexion() as conn:
         row = conn.execute(
             _SELECT_OFFRE + "WHERE o.id = ?",
@@ -121,11 +133,7 @@ def get_offre_par_id(offre_id: int) -> dict | None:
 
     if row is None:
         return None
-    return {
-        **dict(row),
-        "vue": bool(row["vue"]),
-        "favori": bool(row["favori"]),
-    }
+    return _enrichir_offre(row)
 
 
 # ── Actions utilisateur (UPSERT sur actions_utilisateur) ──────────────────────

@@ -322,10 +322,10 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees, nbAvec
 
             {/* Offres périmées */}
             <div>
-              <p className="text-xs font-bold uppercase text-gray-500 mb-1">Offres périmées</p>
+              <p className="text-xs font-bold uppercase text-gray-500 mb-1">Offres périmées et hors ligne</p>
               <label
                 className="flex items-center gap-1.5 cursor-pointer"
-                title="Offres plus revues sur leur site depuis plus de 21 jours, ou collectées il y a plus de 60 jours"
+                title="Offres plus revues sur leur site depuis plus de 21 jours, collectées il y a plus de 60 jours, ou constatées hors ligne"
               >
                 <input
                   type="checkbox"
@@ -333,7 +333,7 @@ export default function Filtres({ offres, filtres, onChange, nbAffichees, nbAvec
                   onChange={() => onChange({ ...filtres, afficherPerimees: !filtres.afficherPerimees })}
                   className="w-3.5 h-3.5 accent-[#ff914d]"
                 />
-                <span className="text-xs font-medium">Afficher les offres périmées</span>
+                <span className="text-xs font-medium">Afficher les offres périmées et hors ligne</span>
               </label>
             </div>
 

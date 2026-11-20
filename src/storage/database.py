@@ -42,16 +42,61 @@ def bornes_fraicheur(maintenant: datetime | None = None) -> tuple[str, str]:
             (m - timedelta(days=AGE_MAX_JOURS)).isoformat())
 
 
+# Statut en ligne constaté par src/verification/en_ligne.py (FANTÔMES-01).
+# Seul HORS_LIGNE masque une offre : INCONNU (délai, 403, 500…) ne masque jamais.
+EN_LIGNE, HORS_LIGNE, INCONNU = "en_ligne", "hors_ligne", "inconnu"
+
+
 def sql_offre_active(alias: str = "o") -> tuple[str, list]:
-    """Clause SQL « offre non périmée » pour la table offres aliasée `alias`, et ses paramètres."""
+    """Clause SQL « offre affichable » pour la table offres aliasée `alias`, et ses paramètres :
+    ni périmée (règle de fraîcheur ci-dessus), ni constatée hors ligne."""
+    migrer_offres_en_ligne()   # l'API ne passe pas par initialiser() : colonne garantie ici
     revue_min, collecte_min = bornes_fraicheur()
     marques = ", ".join("?" for _ in SOURCES_SANS_REVISITE)
     clause = (
-        f"({alias}.source IN ({marques}) OR ("
+        f"(({alias}.source IN ({marques}) OR ("
         f"COALESCE({alias}.date_derniere_vue, {alias}.date_collecte) >= ? "
-        f"AND {alias}.date_collecte >= ?))"
+        f"AND {alias}.date_collecte >= ?)) "
+        f"AND COALESCE({alias}.statut_en_ligne, '') != ?)"
     )
-    return clause, [*SOURCES_SANS_REVISITE, revue_min, collecte_min]
+    return clause, [*SOURCES_SANS_REVISITE, revue_min, collecte_min, HORS_LIGNE]
+
+
+def est_hors_ligne(offre: dict) -> bool:
+    return offre.get("statut_en_ligne") == HORS_LIGNE
+
+
+def derniere_constatation(offre: dict) -> str | None:
+    """Dernière fois que l'offre a été vue vivante : revue dans les listes d'un collecteur,
+    ou vérifiée en ligne. None pour les sources jamais revisitées (Manuelle)."""
+    if offre.get("source") in SOURCES_SANS_REVISITE:
+        return None
+    dates = [offre.get("date_derniere_vue") or offre.get("date_collecte")]
+    if offre.get("statut_en_ligne") == EN_LIGNE and offre.get("date_verification"):
+        dates.append(offre["date_verification"])
+    dates = [d for d in dates if d]
+    return max(dates) if dates else None
+
+
+_colonnes_en_ligne_verifiees: set[str] = set()
+
+
+def migrer_offres_en_ligne(forcer: bool = False):
+    """Migration idempotente : colonnes offres.statut_en_ligne et offres.date_verification.
+
+    Vérifiée une fois par base et par processus (appelée à chaque requête de l'API) ;
+    forcer=True (initialiser) contrôle toujours le schéma.
+    """
+    if not forcer and str(DB_PATH) in _colonnes_en_ligne_verifiees:
+        return
+    with _connexion() as conn:
+        colonnes = {row[1] for row in conn.execute("PRAGMA table_info(offres)")}
+        if colonnes:
+            for colonne in ("statut_en_ligne", "date_verification"):
+                if colonne not in colonnes:
+                    conn.execute(f"ALTER TABLE offres ADD COLUMN {colonne} TEXT")
+                    logger.info("Migration : colonne offres.%s ajoutée", colonne)
+            _colonnes_en_ligne_verifiees.add(str(DB_PATH))
 
 
 def est_perimee(offre: dict, maintenant: datetime | None = None) -> bool:
@@ -110,7 +155,9 @@ def initialiser():
                 date_collecte         TEXT    NOT NULL,
                 date_derniere_vue     TEXT,
                 date_envoi            TEXT,
-                envoyee               INTEGER DEFAULT 0
+                envoyee               INTEGER DEFAULT 0,
+                statut_en_ligne       TEXT,
+                date_verification     TEXT
             );
 
             CREATE TABLE IF NOT EXISTS actions_utilisateur (
@@ -159,6 +206,7 @@ def initialiser():
     migrer_cvs()
     migrer_matchings()
     migrer_parametres()
+    migrer_offres_en_ligne(forcer=True)
     logger.info("Base de données prête : %s", DB_PATH)
 
 

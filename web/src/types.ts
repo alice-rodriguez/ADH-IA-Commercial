@@ -21,4 +21,8 @@ export interface Offre {
   notes: string | null
   /** Offre périmée (plus revue par sa source) : présente seulement si le filtre avancé l'a demandée */
   perimee?: boolean
+  /** Constatée hors ligne par la vérification du pipeline : présente seulement si le filtre avancé l'a demandée */
+  hors_ligne?: boolean
+  /** Dernière fois vue vivante (listes d'un collecteur ou vérification en ligne) ; null pour « Manuelle » */
+  derniere_constatation?: string | null
 }

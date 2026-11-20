@@ -11,7 +11,7 @@ export interface FiltresState {
   toggleVues: 'tout' | 'nouvelles'
   toggleFavoris: 'tout' | 'favoris'
   toggleMatching: 'tout' | 'matching'
-  /** Filtre avancé : afficher aussi les offres périmées (rechargées depuis l'API) */
+  /** Filtre avancé : afficher aussi les offres périmées et hors ligne (rechargées depuis l'API) */
   afficherPerimees: boolean
 }
 
@@ -35,7 +35,7 @@ export function filtrer(
   idsAvecMatching?: Set<number>,
 ): Offre[] {
   return offres.filter((o) => {
-    if (o.perimee && !f.afficherPerimees) return false
+    if ((o.perimee || o.hors_ligne) && !f.afficherPerimees) return false
 
     if (f.sources.length > 0 && o.source && !f.sources.includes(o.source)) {
       return false
