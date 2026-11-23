@@ -313,7 +313,7 @@ variantes_domaines:
     - public
     - secteur public
     - administration
-    - etat
+    - services de l'etat   # et non « etat » seul, qui trouvait « état de l'art »
     - collectivite
     - ministere
     - hopital

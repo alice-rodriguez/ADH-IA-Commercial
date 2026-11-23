@@ -154,9 +154,15 @@ def score_postes(postes: list[str], titre_offre: str, description_offre: str) ->
     return min(100, meilleur + BONUS_POSTE_SUPPLEMENTAIRE * (len(trouves) - 1)), trouves
 
 
+_APOSTROPHES = re.compile(r"['\u2019]")
+
+
 def _mot_entier(variante: str, texte_norm: str) -> bool:
-    """Variante présente en MOTS ENTIERS (« marche » ne trouve plus « démarche »)."""
-    return bool(variante) and re.search(rf"\b{re.escape(variante)}\b", texte_norm) is not None
+    """Variante présente en MOTS ENTIERS (« marche » ne trouve plus « démarche »).
+    Apostrophes droite et typographique ramenées à un espace des deux côtés
+    (« services de l'etat » trouve « services de l’État »)."""
+    variante = _APOSTROPHES.sub(" ", variante or "").strip()
+    return bool(variante) and re.search(rf"\b{re.escape(variante)}\b", _APOSTROPHES.sub(" ", texte_norm)) is not None
 
 
 def secteurs(texte: str) -> list[str]:
