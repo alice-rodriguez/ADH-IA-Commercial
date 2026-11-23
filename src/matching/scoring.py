@@ -6,11 +6,15 @@ poids est redistribué sur les critères qui ont réellement une valeur.
 
 Critères (0–100) :
   postes      postes ciblés de la fiche ADH (saisis par Alice) comparés au titre de l'offre
+  titre_cv    SEULEMENT si les postes ciblés sont vides : titre du CV (titre_courant)
+              comparé au titre puis à la description de l'offre ; vaut moins qu'un poste
+              ciblé et ne donne pas accès au palier 60-100
   competences proportion des compétences du CV présentes dans l'offre
   lieu        zones géographiques (département / région), mobilité de la fiche prioritaire
   experience  seulement si l'offre exige une ancienneté ET que celle du CV est connue
   contrat     seulement si l'offre précise un contrat ET que le candidat a des préférences
-  domaine     BONUS : évalué (100) seulement s'il y a recouvrement sectoriel ; sinon neutre
+  domaine     BONUS : 100 si le CV couvre le SECTEUR de l'offre ; neutre sinon, et neutre
+              quand l'offre ne désigne pas de secteur précis (aucun, ou trop pour trancher)
 
 Garanties de classement :
   - un candidat dont un poste ciblé figure dans le titre de l'offre voit son score
@@ -18,8 +22,10 @@ Garanties de classement :
     eux est conservé) ; un candidat dont les postes ciblés sont RENSEIGNÉS mais dont
     aucun ne correspond plafonne juste en dessous : il ne peut jamais passer devant ;
   - un candidat dont le champ postes ciblés est VIDE n'est ni promu ni plafonné : le
-    critère est NEUTRE (l'outil ne sait rien), son poids est redistribué ;
-  - aucun signal métier (ni poste ciblé trouvé, ni compétence trouvée) → score 0.
+    critère est NEUTRE (l'outil ne sait rien), son poids est redistribué ; son titre de
+    CV est alors utilisé (critère titre_cv) ;
+  - aucun score n'est forcé à 0 : un candidat sans signal métier est classé dernier par la
+    moyenne pondérée (et par le plafond s'il a des postes ciblés), jamais effacé.
 """
 
 import json
@@ -32,7 +38,6 @@ from src.matching.geo import REGION_DE, mentionne_teletravail, zones
 from src.matching.utils import (
     SYNONYMES_COMPETENCES,
     VARIANTES_DOMAINES,
-    _domaines_cv_normalises,
     extraire_annees_requises,
     normaliser,
 )
@@ -48,6 +53,9 @@ POIDS = {
     # Postes ciblés saisis par Alice : le signal le plus fiable, au moins autant
     # que les compétences (exigence MATCH-01).
     "postes":      35,
+    # Titre du CV : second signal métier, utilisé seulement quand les postes ciblés
+    # sont vides ; pèse moins que les postes ciblés.
+    "titre_cv":    20,
     # Compétences extraites du CV par le profilage.
     "competences": 30,
     # Zone géographique (mobilité de la fiche ADH, sinon localisation du CV).
@@ -65,6 +73,19 @@ POIDS = {
 POSTE_DANS_TITRE = 80          # un poste ciblé figure dans le titre de l'offre
 POSTE_DANS_DESCRIPTION = 40    # trouvé seulement dans la description
 BONUS_POSTE_SUPPLEMENTAIRE = 10
+
+# Score « titre du CV » (postes ciblés vides)
+TITRE_CV_DANS_TITRE = 100      # pondéré par POIDS["titre_cv"], plus faible que celui des postes
+TITRE_CV_DANS_DESCRIPTION = 50
+
+# Domaine
+# Clés de variantes_domaines (config/criteria.yaml) qui décrivent une NATURE de projet
+# et non un secteur client : « transformation », « migration », « cloud »… figurent
+# dans presque toutes les offres et presque tous les profils, elles ne départagent rien.
+DOMAINES_TRANSVERSES = ("it_transformation",)
+# Au-delà de ce nombre de secteurs reconnus, le texte de l'offre est trop général
+# pour désigner un secteur : critère neutre.
+SECTEURS_MAX_OFFRE = 2
 
 # Garantie de classement (voir docstring du module)
 PLANCHER_POSTE_DANS_TITRE = 60
@@ -133,14 +154,58 @@ def score_postes(postes: list[str], titre_offre: str, description_offre: str) ->
     return min(100, meilleur + BONUS_POSTE_SUPPLEMENTAIRE * (len(trouves) - 1)), trouves
 
 
-def score_domaine(domaines_cv: list[str], texte_offre: str) -> tuple[Optional[int], list[str]]:
-    """Bonus sectoriel : 100 si au moins un secteur du CV figure dans l'offre, sinon NEUTRE."""
-    if not domaines_cv or not texte_offre:
-        return None, []
-    texte_norm = normaliser(texte_offre)
-    communs = [cle for cle in sorted(_domaines_cv_normalises(domaines_cv))
-               if any(v in texte_norm for v in VARIANTES_DOMAINES[cle])]
-    return (100, communs) if communs else (None, [])
+def _mot_entier(variante: str, texte_norm: str) -> bool:
+    """Variante présente en MOTS ENTIERS (« marche » ne trouve plus « démarche »)."""
+    return bool(variante) and re.search(rf"\b{re.escape(variante)}\b", texte_norm) is not None
+
+
+def secteurs(texte: str) -> list[str]:
+    """Secteurs (clés de variantes_domaines, hors clés transverses) nommés dans un texte."""
+    texte_norm = normaliser(texte or "")
+    return sorted(cle for cle, variantes in VARIANTES_DOMAINES.items()
+                  if cle not in DOMAINES_TRANSVERSES and any(_mot_entier(v, texte_norm) for v in variantes))
+
+
+def score_titre_cv(titre_cv: str, titre_offre: str, description_offre: str) -> tuple[int, list[dict]]:
+    """Titre du CV (« Business Analyst - Finance | Banking ») comparé à l'offre, quand les
+    postes ciblés sont vides. Seuls les segments de métier comptent : les segments qui ne
+    sont qu'un nom de secteur (« Finance », « Banking ») sont ignorés, le domaine les traite."""
+    segments = [seg for seg in postes_cibles({"postes_cibles": titre_cv})
+                if len(seg) >= 3 and not secteurs(seg)]
+    titre = _normaliser_titre(titre_offre or "")
+    description = _normaliser_texte(description_offre or "")
+    trouves = []
+    for seg in segments:
+        motif = _motif(seg)
+        if motif.search(titre):
+            trouves.append({"segment": seg, "ou": "titre"})
+        elif motif.search(description):
+            trouves.append({"segment": seg, "ou": "description"})
+    if any(t["ou"] == "titre" for t in trouves):
+        return TITRE_CV_DANS_TITRE, trouves
+    if trouves:
+        return TITRE_CV_DANS_DESCRIPTION, trouves
+    return 0, []
+
+
+def score_domaine(domaines_cv: list[str], texte_secteur_offre: str) -> tuple[Optional[int], list[str], str]:
+    """(score ou None, secteurs communs, explication).
+
+    Bonus : 100 si le CV couvre un secteur désigné par l'offre ; sinon NEUTRE (jamais un
+    couperet). NEUTRE aussi quand l'offre ne désigne aucun secteur ou en nomme plus de
+    SECTEURS_MAX_OFFRE (texte trop général pour départager)."""
+    secteurs_offre = secteurs(texte_secteur_offre)
+    if not secteurs_offre:
+        return None, [], "offre sans secteur reconnu"
+    if len(secteurs_offre) > SECTEURS_MAX_OFFRE:
+        return None, [], f"offre trop générale ({len(secteurs_offre)} secteurs : {', '.join(secteurs_offre)})"
+    secteurs_cv = set(secteurs(" ; ".join(domaines_cv))) if domaines_cv else set()
+    if not secteurs_cv:
+        return None, [], "secteurs du CV inconnus"
+    communs = [c for c in secteurs_offre if c in secteurs_cv]
+    if communs:
+        return 100, communs, f"secteur de l'offre couvert ({', '.join(communs)})"
+    return None, [], f"secteur de l'offre ({', '.join(secteurs_offre)}) hors profil"
 
 
 def score_experience(annees_cv: Optional[int], texte_offre: str) -> tuple[Optional[int], Optional[int]]:
@@ -237,36 +302,43 @@ def calculer_score_global(cv: dict, offre: dict) -> dict:
     type_offre: Optional[str] = offre.get("type_contrat_clarifie") or offre.get("type_contrat")
 
     sp, postes_trouves = score_postes(postes_cibles(cv), titre, description)
+    # Postes ciblés vides : le titre du CV prend le relais (poids plus faible, pas de palier)
+    st, titre_trouve = (None, [])
+    titre_cv = (cv.get("titre_courant") or "").strip()
+    if sp is None and titre_cv:
+        st, titre_trouve = score_titre_cv(titre_cv, titre, description)
     sc = score_competences(competences_cv, texte_offre)
-    sd, domaines_communs = score_domaine(domaines_cv, texte_offre)
+    sd, domaines_communs, domaine_explication = score_domaine(domaines_cv, f"{titre} {description}")
     se, annees_requises = score_experience(annees_cv, texte_offre)
     sct = score_contrat(types_cv, type_offre)
     sl, lieu_explication = score_lieu(lieu_candidat, lieu_offre)
 
-    valeurs = {"postes": sp, "competences": sc, "lieu": sl, "experience": se, "domaine": sd, "contrat": sct}
+    valeurs = {"postes": sp, "titre_cv": st, "competences": sc, "lieu": sl, "experience": se,
+               "domaine": sd, "contrat": sct}
     evalues = {k: v for k, v in valeurs.items() if v is not None}
     poids_total = sum(POIDS[k] for k in evalues)
     brut = sum(POIDS[k] * v for k, v in evalues.items()) / poids_total if poids_total else 0
 
     poste_dans_titre = any(t["ou"] == "titre" for t in postes_trouves)
-    aucun_signal_metier = not postes_trouves and sc == 0
-    if aucun_signal_metier:
-        global_, palier = 0, "aucun signal métier (ni poste ciblé ni compétence trouvés)"
-    elif poste_dans_titre:
+    if poste_dans_titre:
         # [0, 100] → [PLANCHER, 100] : garantie de rang sans écraser les écarts entre candidats
         global_ = round(PLANCHER_POSTE_DANS_TITRE + (100 - PLANCHER_POSTE_DANS_TITRE) * brut / 100)
         palier = "poste ciblé dans le titre (échelle 60-100)"
     elif sp is None:
-        # Champ postes ciblés vide : critère neutre (poids redistribué), aucun plafond
-        global_, palier = round(brut), "postes ciblés non renseignés (critère neutre)"
+        # Champ postes ciblés vide : critère neutre (poids redistribué), aucun plafond ni palier
+        global_ = round(brut)
+        palier = ("postes ciblés vides, titre du CV trouvé dans l'offre" if titre_trouve
+                  else "postes ciblés vides (critère neutre)")
     elif not postes_trouves:
         global_, palier = min(round(brut), PLAFOND_SANS_POSTE), "aucun poste ciblé correspondant (plafond)"
     else:
         global_, palier = round(brut), "poste ciblé dans la description"
 
     details = {
-        "version": "MATCH-01",
+        "version": "MATCH-01.bis",
         "score_postes": sp,
+        "score_titre_cv": st,
+        "titre_cv_trouve": titre_trouve,
         "postes_cibles_trouves": [t["poste"] for t in postes_trouves],
         "postes_correspondances": postes_trouves,
         "score_competences": sc,
@@ -281,13 +353,14 @@ def calculer_score_global(cv: dict, offre: dict) -> dict:
         "nb_competences_cv": len(competences_cv),
         "domaines_cv": domaines_cv,
         "domaines_communs": domaines_communs,
+        "domaine_explication": domaine_explication,
         "annees_cv": annees_cv,
         "annees_requises": annees_requises,
         "types_contrat_cv": types_cv,
         "lieu_cv": lieu_candidat or None,
         "lieu_cv_source": source_lieu,
         "lieu_explication": lieu_explication,
-        "plancher_active": aucun_signal_metier,
+        "plancher_active": False,   # plancher « aucun signal métier » supprimé (MATCH-01.bis)
     }
 
     def colonne(v):

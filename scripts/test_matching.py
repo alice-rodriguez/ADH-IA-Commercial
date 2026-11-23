@@ -40,7 +40,7 @@ sys.path.insert(0, str(ROOT))
 REF_AVANT = "c56a28b"   # dernier commit avant MATCH-01
 SEUIL_AFFICHAGE = 30
 CRITERES_AVANT = ["competences", "domaine", "experience", "contrat", "lieu"]
-CRITERES_APRES = ["postes", "competences", "domaine", "experience", "contrat", "lieu"]
+CRITERES_APRES = ["postes", "titre_cv", "competences", "domaine", "experience", "contrat", "lieu"]
 
 
 def _git_show(ref: str, chemin: str) -> str:
@@ -100,6 +100,8 @@ def sous_scores(resultat: dict, criteres: list[str]) -> dict:
             sortie[c] = None
         elif c == "postes":
             sortie[c] = d.get("score_postes")
+        elif c == "titre_cv":
+            sortie[c] = d.get("score_titre_cv")
         else:
             sortie[c] = resultat.get(f"score_{c}")
     return sortie
@@ -118,6 +120,8 @@ def main():
     ap.add_argument("--ref", default=REF_AVANT, help="commit de la version AVANT du moteur")
     ap.add_argument("--db", default=None, help="base (défaut : DB_PATH ou data/offers.db)")
     ap.add_argument("--offre", type=int, default=5260, help="offre dont afficher le classement complet")
+    ap.add_argument("--suivre", action="append", default=None,
+                    help="nom (ou partie) d'un candidat dont afficher le rang sur l'offre (défaut : Ebune)")
     args = ap.parse_args()
 
     db = Path(args.db or os.environ.get("DB_PATH") or ROOT / "data" / "offers.db")
@@ -162,9 +166,19 @@ def main():
                 suite = ""
                 if cle == 2:
                     d = json.loads(r["details_json"])
-                    suite = f"   {d['palier']} ; {', '.join(d['postes_cibles_trouves']) or '—'} ; lieu : {d['lieu_explication']}"
+                    suite = (f"   {d['palier']} ; {', '.join(d['postes_cibles_trouves']) or '—'} ; "
+                             f"lieu : {d['lieu_explication']} ; domaine : {d.get('domaine_explication', '?')}")
                 print(f"   {rang:>4}  {cv['id']:>3}  {nom_cv(cv):<26}  {r['score_global']:>5}   "
                       + " ".join(f"{fmt(ss[c]):>6}" for c in criteres) + suite)
+
+        # Rang des candidats suivis
+        for motif in (args.suivre or ["Ebune"]):
+            for cv, ra, rp in lignes:
+                if motif.lower() in nom_cv(cv).lower() or motif.lower() in (cv.get("nom_fichier") or "").lower():
+                    rang_av = 1 + sum(1 for _, x, _ in lignes if x["score_global"] > ra["score_global"])
+                    rang_ap = 1 + sum(1 for _, _, y in lignes if y["score_global"] > rp["score_global"])
+                    print(f"\n   Suivi « {motif} » : CV {cv['id']} {nom_cv(cv)} — titre « {cv.get('titre_courant') or ''} » — "
+                          f"rang {rang_av} → {rang_ap} sur {len(lignes)} (score {ra['score_global']} → {rp['score_global']})")
 
     # Calcul de tous les couples
     couples = []
@@ -196,6 +210,11 @@ def main():
         print(ligne(*c))
     print("\n   LES DIX COUPLES QUI RECULENT LE PLUS")
     for c in mouvements[:10]:
+        print(ligne(*c))
+
+    tombes = [(cv, o, a, p) for cv, o, a, p in couples if a > 0 and p["score_global"] == 0]
+    print(f"\n   Couples tombés à 0 (score > 0 avant, 0 après) : {len(tombes)}")
+    for c in tombes[:10]:
         print(ligne(*c))
 
     # d) Inchangés
