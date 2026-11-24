@@ -13,8 +13,13 @@ Affiche :
   e) les CV dont le champ « postes ciblés » est vide (critère neutre) : à remplir par Alice ;
   f) les secteurs détectés dans TOUTES les offres de la base (nombre d'offres par secteur),
      avec, pour les trois plus fréquents, cinq titres et le mot déclencheur cité dans son texte.
+  g) le nombre d'offres qui passent le pré-filtre par mots-clés avec config/criteria.yaml
+     AVANT (au commit --ref) et APRÈS (fichier du répertoire de travail).
   Pour l'offre --offre, chaque secteur détecté est justifié par la variante de
   config/criteria.yaml et le PASSAGE EXACT du texte de l'annonce qui la déclenche.
+
+  AVANT utilise le moteur ET config/criteria.yaml du commit --ref : avec --ref sur le
+  dernier commit, la comparaison isole l'effet d'une modification de criteria.yaml.
 
 Usage (depuis la racine du dépôt) :
   py scripts\\test_matching.py --db data\\offers.db
@@ -55,11 +60,23 @@ def _git_show(ref: str, chemin: str) -> str:
         sys.exit(f"Impossible de lire {chemin} au commit {ref} via git : {e}")
 
 
+def criteres_au_commit(ref: str) -> dict:
+    import yaml
+    return yaml.safe_load(_git_show(ref, "config/criteria.yaml"))
+
+
 def charger_moteur_avant(ref: str):
-    """Ancien scoring.py exécuté contre l'ancien utils.py (tous deux lus dans git)."""
+    """Ancien scoring.py exécuté contre l'ancien utils.py ET l'ancien config/criteria.yaml
+    (tous lus dans git) : l'AVANT ne dépend pas des fichiers du répertoire de travail."""
+    import re
+    import tempfile
+    yaml_avant = Path(tempfile.gettempdir()) / f"criteria_avant_{ref}.yaml"
+    yaml_avant.write_text(_git_show(ref, "config/criteria.yaml"), encoding="utf-8")
+    source_utils = re.sub(r"^_CRITERIA_YAML = .*$", f"_CRITERIA_YAML = Path({str(yaml_avant)!r})",
+                          _git_show(ref, "src/matching/utils.py"), count=1, flags=re.M)
     utils = types.ModuleType("matching_utils_avant")
-    utils.__file__ = str(ROOT / "src" / "matching" / "utils.py")   # utils localise config/ depuis __file__
-    exec(compile(_git_show(ref, "src/matching/utils.py"), "utils_avant.py", "exec"), utils.__dict__)
+    utils.__file__ = str(ROOT / "src" / "matching" / "utils.py")
+    exec(compile(source_utils, "utils_avant.py", "exec"), utils.__dict__)
     scoring = types.ModuleType("matching_scoring_avant")
     scoring.__file__ = str(ROOT / "src" / "matching" / "scoring.py")
     sauvegarde = sys.modules.get("src.matching.utils")
@@ -289,23 +306,50 @@ def main():
         print(f"   CV {cv['id']:>3}  {nom_cv(cv):<26}  {cv.get('titre_courant') or ''}")
     # f) Ampleur des détections de secteur, sur toutes les offres de la base
     conn = ouvrir_lecture_seule(db)
-    toutes = [dict(r) for r in conn.execute("SELECT id, titre, description, resume_ia FROM offres")]
+    toutes = [dict(r) for r in conn.execute("SELECT id, titre, description, resume_ia, entreprise FROM offres")]
     conn.close()
+    from src.matching.utils import normaliser
+    variantes_ref = (criteres_au_commit(args.ref) or {}).get("variantes_domaines") or {}
+    moteur_ref = types.SimpleNamespace(
+        VARIANTES_DOMAINES={k: [normaliser(v) for v in vs] for k, vs in variantes_ref.items()},
+        DOMAINES_TRANSVERSES=apres.DOMAINES_TRANSVERSES, motif_secteur=apres.motif_secteur)
     par_secteur: dict[str, list] = {}
+    par_secteur_ref: dict[str, list] = {}
     for o in toutes:
-        for cle, liste in declencheurs(_texte_secteur(o), apres).items():
+        texte = _texte_secteur(o)
+        for cle, liste in declencheurs(texte, apres).items():
             par_secteur.setdefault(cle, []).append((o, liste))
-    print(f"\nf) SECTEURS DÉTECTÉS DANS LES {len(toutes)} OFFRES DE LA BASE (moteur APRÈS, config/criteria.yaml actuel)")
-    for cle, items in sorted(par_secteur.items(), key=lambda x: -len(x[1])):
-        mots = Counter(v for _, liste in items for v, _ in liste)
-        print(f"   {cle:<14} {len(items):>5} offre(s) ({100 * len(items) / max(1, len(toutes)):.0f} %) — "
-              f"variantes : {', '.join(f'{v} ({n})' for v, n in mots.most_common(6))}")
+        for cle, liste in declencheurs(texte, moteur_ref).items():
+            par_secteur_ref.setdefault(cle, []).append((o, liste))
+    n = max(1, len(toutes))
+    print(f"\nf) SECTEURS DÉTECTÉS DANS LES {len(toutes)} OFFRES DE LA BASE (règles de détection APRÈS)")
+    print(f"   {'secteur':<14} {'AVANT (criteria @ ' + args.ref + ')':>26} {'APRÈS (criteria actuel)':>26}")
+    for cle in sorted(set(par_secteur) | set(par_secteur_ref), key=lambda c: -len(par_secteur_ref.get(c, []))):
+        na, np_ = len(par_secteur_ref.get(cle, [])), len(par_secteur.get(cle, []))
+        print(f"   {cle:<14} {na:>14} ({100 * na / n:>3.0f} %) {np_:>18} ({100 * np_ / n:>3.0f} %)")
+    print("\n   Variantes déclenchantes (les plus fréquentes) :")
+    for cle in sorted(set(par_secteur) | set(par_secteur_ref), key=lambda c: -len(par_secteur_ref.get(c, []))):
+        for libelle, source in (("AVANT", par_secteur_ref), ("APRÈS", par_secteur)):
+            mots = Counter(v for _, liste in source.get(cle, []) for v, _ in liste)
+            print(f"   {cle:<14} {libelle:<6} {', '.join(f'{v} ({k})' for v, k in mots.most_common(8)) or '—'}")
     for cle, items in sorted(par_secteur.items(), key=lambda x: -len(x[1]))[:3]:
         print(f"\n   {cle} — cinq exemples :")
         for o, liste in items[:5]:
             variante, passage = liste[0]
             print(f"     offre {o['id']:>5} « {(o.get('titre') or '')[:60]} »\n"
                   f"                 « {variante} » : {passage}")
+
+    # g) Pré-filtre par mots-clés : nombre d'offres qui passent, criteria AVANT / APRÈS
+    import yaml
+    from src.filters.keyword_filter import evaluer
+    criteres_ref = criteres_au_commit(args.ref)
+    criteres_actuel = yaml.safe_load((ROOT / "config" / "criteria.yaml").read_text(encoding="utf-8"))
+    passent_ref = {o["id"] for o in toutes if evaluer(dict(o), criteres_ref)[0]}
+    passent_act = {o["id"] for o in toutes if evaluer(dict(o), criteres_actuel)[0]}
+    print(f"\ng) PRÉ-FILTRE PAR MOTS-CLÉS (keyword_filter.evaluer, sur les {len(toutes)} offres)")
+    print(f"   passent avec criteria @ {args.ref} : {len(passent_ref)} ; avec criteria actuel : {len(passent_act)} ; "
+          f"verdicts changés : {len(passent_ref ^ passent_act)}")
+    print("   (le pré-filtre lit la section mots_cles de criteria.yaml, pas variantes_domaines)")
 
     print("\nAucune écriture en base.")
 

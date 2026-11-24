@@ -236,11 +236,12 @@ variantes_domaines:
     - bancaire
     - finance
     - financial
-    - financier
+    - secteur financier   # MATCH-01.quater, remplace « financier » : « suivi financier » du projet
+    - services financiers   # MATCH-01.quater
     - trading
     - traders
     - bourse
-    - marche
+    - salle des marches   # MATCH-01.quater, remplace « marche » : tout emploi de « marché » (« marches financiers » existe déjà)
     - marches financiers
     - capital markets
     - capital market
@@ -275,22 +276,24 @@ variantes_domaines:
     - data platform
     - cloud
   energie:
-    - energie
+    - de l'energie   # MATCH-01.quater, remplace « energie » : « votre énergie », « plein d'énergie »
+    - energetique   # MATCH-01.quater
     - energy
     - utilities
     - electricite
     - gaz
     - petrol
     - petrole
-    - renouvelable
+    - energie renouvelable   # MATCH-01.quater, remplace « renouvelable » : « mission renouvelable »
+    - energies renouvelables   # MATCH-01.quater
   telecom:
     - telecom
     - telecommunication
     - telecommunications
     - telco
-    - operateur
-    - mobile
-    - internet
+    - operateur telecom   # MATCH-01.quater, remplace « operateur »
+    - reseau mobile   # MATCH-01.quater, remplace « mobile » : « application mobile »
+    - fournisseur d'acces internet   # MATCH-01.quater, remplace « internet »
   industrie:
     - industrie
     - industrie manufacturiere
@@ -298,21 +301,21 @@ variantes_domaines:
     - automobile
     - aeronautique
     - aerospatial
-    - defense
+    - industrie de defense   # MATCH-01.quater, remplace « defense » : « La Défense »
     - chimie
     - pharmacie
   retail:
     - retail
-    - distribution
+    - secteur de la distribution   # MATCH-01.quater, remplace « distribution » : « distribution des contrats »
     - grande distribution
-    - commerce
+    - commerce de detail   # MATCH-01.quater, remplace « commerce »
     - ecommerce
     - luxe
-    - mode
+    - secteur de la mode   # MATCH-01.quater, remplace « mode » : « en mode hybride », « le mode projet »
   public:
-    - public
+    - service public   # MATCH-01.quater, remplace « public » : « cloud public », « grand public »
     - secteur public
-    - administration
+    - administration publique   # MATCH-01.quater, remplace « administration » : « administration système »
     - services de l'etat   # et non « etat » seul, qui trouvait « état de l'art »
     - collectivite
     - ministere
