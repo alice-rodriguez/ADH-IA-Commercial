@@ -65,6 +65,21 @@ def criteres_au_commit(ref: str) -> dict:
     return yaml.safe_load(_git_show(ref, "config/criteria.yaml"))
 
 
+def pointer_utils_vers_yaml(source_utils: str, chemin_yaml) -> str:
+    """Remplace la ligne _CRITERIA_YAML = … du source de utils.py pour qu'il lise `chemin_yaml`.
+
+    Le chemin est écrit au format POSIX (C:/Users/… sous Windows : aucun antislash dans le
+    source généré) et inséré par une fonction de remplacement, que re.sub ne réinterprète pas
+    (dans une chaîne de remplacement, re.sub réduit les antislashs doublés à un seul : un chemin
+    Windows comme C:/Users/alice/AppData, écrit avec des antislashs, donnait alors des
+    séquences d'échappement invalides dans le source généré).
+    """
+    import re
+    posix = chemin_yaml.as_posix() if hasattr(chemin_yaml, "as_posix") else str(chemin_yaml).replace("\\", "/")
+    ligne = f"_CRITERIA_YAML = Path({posix!r})"
+    return re.sub(r"^_CRITERIA_YAML = .*$", lambda _m: ligne, source_utils, count=1, flags=re.M)
+
+
 def charger_moteur_avant(ref: str):
     """Ancien scoring.py exécuté contre l'ancien utils.py ET l'ancien config/criteria.yaml
     (tous lus dans git) : l'AVANT ne dépend pas des fichiers du répertoire de travail."""
@@ -72,8 +87,7 @@ def charger_moteur_avant(ref: str):
     import tempfile
     yaml_avant = Path(tempfile.gettempdir()) / f"criteria_avant_{ref}.yaml"
     yaml_avant.write_text(_git_show(ref, "config/criteria.yaml"), encoding="utf-8")
-    source_utils = re.sub(r"^_CRITERIA_YAML = .*$", f"_CRITERIA_YAML = Path({str(yaml_avant)!r})",
-                          _git_show(ref, "src/matching/utils.py"), count=1, flags=re.M)
+    source_utils = pointer_utils_vers_yaml(_git_show(ref, "src/matching/utils.py"), yaml_avant)
     utils = types.ModuleType("matching_utils_avant")
     utils.__file__ = str(ROOT / "src" / "matching" / "utils.py")
     exec(compile(source_utils, "utils_avant.py", "exec"), utils.__dict__)
