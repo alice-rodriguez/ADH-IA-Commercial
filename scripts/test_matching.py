@@ -10,7 +10,11 @@ Affiche :
   b) la distribution des scores globaux par tranches de dix (et au-dessus du seuil d'affichage 30) ;
   c) les dix couples qui progressent le plus et les dix qui reculent le plus ;
   d) le nombre de couples dont le score ne change pas ;
-  e) les CV dont le champ « postes ciblés » est vide (critère neutre) : à remplir par Alice.
+  e) les CV dont le champ « postes ciblés » est vide (critère neutre) : à remplir par Alice ;
+  f) les secteurs détectés dans TOUTES les offres de la base (nombre d'offres par secteur),
+     avec, pour les trois plus fréquents, cinq titres et le mot déclencheur cité dans son texte.
+  Pour l'offre --offre, chaque secteur détecté est justifié par la variante de
+  config/criteria.yaml et le PASSAGE EXACT du texte de l'annonce qui la déclenche.
 
 Usage (depuis la racine du dépôt) :
   py scripts\\test_matching.py --db data\\offers.db
@@ -107,6 +111,57 @@ def sous_scores(resultat: dict, criteres: list[str]) -> dict:
     return sortie
 
 
+def _texte_secteur(offre: dict) -> str:
+    """Le texte dans lequel le moteur cherche le secteur (titre + description + résumé IA)."""
+    return " ".join(str(v) for v in [offre.get("titre"), offre.get("description"), offre.get("resume_ia")] if v)
+
+
+def _normaliser_avec_positions(texte: str, retirer_tirets: bool) -> tuple[str, list[int]]:
+    """Même normalisation que le moteur (scoring.textes_secteur) : minuscules, sans accents,
+    apostrophes → espace, tirets et barres gardés ou retirés ; avec la position d'origine
+    de chaque caractère pour citer le passage exact."""
+    import unicodedata
+    sortie, positions = [], []
+    for i, ch in enumerate(texte):
+        if retirer_tirets and ch in "/-":
+            continue
+        if ch in "'\u2019":
+            morceau = " "
+        else:
+            morceau = "".join(c for c in unicodedata.normalize("NFD", ch.lower()) if unicodedata.category(c) != "Mn")
+        for c in morceau:
+            sortie.append(c)
+            positions.append(i)
+    return "".join(sortie), positions
+
+
+def declencheurs(texte: str, moteur) -> dict[str, list[tuple[str, str]]]:
+    """{secteur: [(variante, passage exact du texte d'origine)]} selon les règles du moteur APRÈS
+    (comparaison tolérante : mots entiers, pluriels et féminins)."""
+    texte = texte or ""
+    formes = [_normaliser_avec_positions(texte, False), _normaliser_avec_positions(texte, True)]
+    resultat = {}
+    for cle, variantes in moteur.VARIANTES_DOMAINES.items():
+        if cle in moteur.DOMAINES_TRANSVERSES:
+            continue
+        vus = set()
+        for v in variantes:
+            motif = moteur.motif_secteur(v)
+            if motif is None:
+                continue
+            for norm, positions in formes:
+                for m in motif.finditer(norm):
+                    debut, fin = positions[m.start()], positions[m.end() - 1] + 1
+                    if (debut, fin) in vus:
+                        continue
+                    vus.add((debut, fin))
+                    a, b = max(0, debut - 60), min(len(texte), fin + 60)
+                    passage = (("…" if a else "") + texte[a:debut] + "[" + texte[debut:fin] + "]"
+                               + texte[fin:b] + ("…" if b < len(texte) else "")).replace("\n", " ")
+                    resultat.setdefault(cle, []).append((v, passage))
+    return resultat
+
+
 def fmt(v) -> str:
     return "  —" if v is None else f"{v:>3}"
 
@@ -152,6 +207,12 @@ def main():
     else:
         o = dict(offre_cible)
         print(f"   « {o.get('titre')} » — {o.get('entreprise') or '?'} — {o.get('lieu') or 'lieu ?'} — {o.get('type_contrat_clarifie') or o.get('type_contrat') or 'contrat ?'}")
+        trouves = declencheurs(_texte_secteur(o), apres)
+        print(f"\n   Secteurs détectés par le moteur APRÈS : {', '.join(sorted(trouves)) or 'aucun'}"
+              + (f" (plus de {apres.SECTEURS_MAX_OFFRE} : critère neutre)" if len(trouves) > apres.SECTEURS_MAX_OFFRE else ""))
+        for cle, liste in sorted(trouves.items()):
+            for variante, passage in liste:
+                print(f"     {cle:<12} variante « {variante} » : {passage}")
         lignes = []
         for cv in cvs:
             ra, rp = avant.calculer_score_global(cv, o), apres.calculer_score_global(cv, o)
@@ -226,6 +287,26 @@ def main():
     print("   (critère neutre pour eux : le moteur ne peut pas s'appuyer sur le signal le plus fiable)")
     for cv in vides:
         print(f"   CV {cv['id']:>3}  {nom_cv(cv):<26}  {cv.get('titre_courant') or ''}")
+    # f) Ampleur des détections de secteur, sur toutes les offres de la base
+    conn = ouvrir_lecture_seule(db)
+    toutes = [dict(r) for r in conn.execute("SELECT id, titre, description, resume_ia FROM offres")]
+    conn.close()
+    par_secteur: dict[str, list] = {}
+    for o in toutes:
+        for cle, liste in declencheurs(_texte_secteur(o), apres).items():
+            par_secteur.setdefault(cle, []).append((o, liste))
+    print(f"\nf) SECTEURS DÉTECTÉS DANS LES {len(toutes)} OFFRES DE LA BASE (moteur APRÈS, config/criteria.yaml actuel)")
+    for cle, items in sorted(par_secteur.items(), key=lambda x: -len(x[1])):
+        mots = Counter(v for _, liste in items for v, _ in liste)
+        print(f"   {cle:<14} {len(items):>5} offre(s) ({100 * len(items) / max(1, len(toutes)):.0f} %) — "
+              f"variantes : {', '.join(f'{v} ({n})' for v, n in mots.most_common(6))}")
+    for cle, items in sorted(par_secteur.items(), key=lambda x: -len(x[1]))[:3]:
+        print(f"\n   {cle} — cinq exemples :")
+        for o, liste in items[:5]:
+            variante, passage = liste[0]
+            print(f"     offre {o['id']:>5} « {(o.get('titre') or '')[:60]} »\n"
+                  f"                 « {variante} » : {passage}")
+
     print("\nAucune écriture en base.")
 
 

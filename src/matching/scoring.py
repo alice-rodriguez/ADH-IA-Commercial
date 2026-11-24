@@ -72,7 +72,7 @@ POIDS = {
 # correspondance supplémentaire.
 POSTE_DANS_TITRE = 80          # un poste ciblé figure dans le titre de l'offre
 POSTE_DANS_DESCRIPTION = 40    # trouvé seulement dans la description
-BONUS_POSTE_SUPPLEMENTAIRE = 10
+BONUS_POSTE_SUPPLEMENTAIRE = 15   # MATCH-01.ter : 10 → 15
 
 # Score « titre du CV » (postes ciblés vides)
 TITRE_CV_DANS_TITRE = 100      # pondéré par POIDS["titre_cv"], plus faible que celui des postes
@@ -157,19 +157,35 @@ def score_postes(postes: list[str], titre_offre: str, description_offre: str) ->
 _APOSTROPHES = re.compile(r"['\u2019]")
 
 
-def _mot_entier(variante: str, texte_norm: str) -> bool:
-    """Variante présente en MOTS ENTIERS (« marche » ne trouve plus « démarche »).
-    Apostrophes droite et typographique ramenées à un espace des deux côtés
-    (« services de l'etat » trouve « services de l’État »)."""
+def textes_secteur(texte: str) -> tuple[str, str]:
+    """Formes normalisées d'un texte pour chercher les secteurs : minuscules, sans accents,
+    apostrophes droite et typographique ramenées à un espace ; tirets et barres gardés comme
+    séparateurs (« Hauts-de-France »), puis retirés (« e-commerce » → « ecommerce »)."""
+    base = _APOSTROPHES.sub(" ", _normaliser_texte(texte or ""))
+    return base, re.sub(r"[/-]", "", base)
+
+
+def motif_secteur(variante: str):
+    """Motif TOLÉRANT de keyword_filter (comme le pré-filtre, CORRECTIF-11) : mots entiers
+    (« marche » ne trouve pas « démarche »), pluriels et féminins acceptés (« banques »,
+    « assurances »), sigles de 1 à 3 lettres cherchés à l'identique. None si la variante est vide."""
     variante = _APOSTROPHES.sub(" ", variante or "").strip()
-    return bool(variante) and re.search(rf"\b{re.escape(variante)}\b", _APOSTROPHES.sub(" ", texte_norm)) is not None
+    return _motif(variante) if variante else None
 
 
 def secteurs(texte: str) -> list[str]:
     """Secteurs (clés de variantes_domaines, hors clés transverses) nommés dans un texte."""
-    texte_norm = normaliser(texte or "")
-    return sorted(cle for cle, variantes in VARIANTES_DOMAINES.items()
-                  if cle not in DOMAINES_TRANSVERSES and any(_mot_entier(v, texte_norm) for v in variantes))
+    formes = textes_secteur(texte)
+    trouves = []
+    for cle, variantes in VARIANTES_DOMAINES.items():
+        if cle in DOMAINES_TRANSVERSES:
+            continue
+        for v in variantes:
+            motif = motif_secteur(v)
+            if motif is not None and any(motif.search(f) for f in formes):
+                trouves.append(cle)
+                break
+    return sorted(trouves)
 
 
 def score_titre_cv(titre_cv: str, titre_offre: str, description_offre: str) -> tuple[int, list[dict]]:
@@ -341,7 +357,7 @@ def calculer_score_global(cv: dict, offre: dict) -> dict:
         global_, palier = round(brut), "poste ciblé dans la description"
 
     details = {
-        "version": "MATCH-01.bis",
+        "version": "MATCH-01.ter",
         "score_postes": sp,
         "score_titre_cv": st,
         "titre_cv_trouve": titre_trouve,
